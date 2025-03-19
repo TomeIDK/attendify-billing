@@ -1,0 +1,51 @@
+name: FOSSBilling CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+      - main  # Trigger the pipeline on pushes to the "main" branch
+  pull_request:
+    branches:
+      - main  # Trigger the pipeline on pull requests to the "main" branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # GitHub Actions runs the CI jobs on Ubuntu
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: "Debug: Docker"
+        run: docker info
+      - name: "Debug: System Info"
+        run: |
+          whoami
+          groups
+          hostname
+          pwd
+          ls
+
+      - name: Build Docker Image for FOSSBilling
+        run: |
+          docker compose up --build
+
+      - name: Run Tests
+        run: |
+          docker-compose up -d
+          sleep 10  # Wait for containers to start
+          docker ps  # List running containers
+          # Add commands here to run tests on your Docker container, like running PHPUnit or any other tests
+          docker-compose down
+
+  # deploy:
+  #   needs: build  
+  #   runs-on: development VM
+
+  #   steps:
+  #     - name: deploy fossbilling
+  #       run: |
+  #           git pull origin main  # Pull the latest changes from the repository
+  #           docker-compose up --build -d  # Rebuild and restart containers
+  #           docker system prune -f  # Clean up old images
