@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-      - main  # Trigger the pipeline on pushes to the "main" branch
+      - main  # Trigger the pipeline on pushes to the "main" or "def" branch
   pull_request:
     branches:
       - main  # Trigger the pipeline on pull requests to the "main" branch
@@ -14,20 +14,21 @@ jobs:
     runs-on: ubuntu-latest  # GitHub Actions runs the CI jobs on Ubuntu
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repository #Fetch latest code from repository
         uses: actions/checkout@v3
       
-      - name: "Debug: Docker"
+      - name: "Debug: Docker" #Debugging step to display Docker information
         run: docker info
-      - name: "Debug: System Info"
+        
+      - name: "Debug: System Info" #Extra debugging step to display system status
         run: |
-          whoami
+          whoami 
           groups
           hostname
           pwd
           ls
 
-      - name: Build Docker Image for FOSSBilling
+      - name: Build Docker Image for FOSSBilling 
         run: |
           docker compose up --build
 
@@ -36,8 +37,7 @@ jobs:
           docker-compose up -d
           sleep 10  # Wait for containers to start
           docker ps  # List running containers
-          # Add commands here to run tests on your Docker container, like running PHPUnit or any other tests
-          docker-compose down
+          docker-compose down # stops and removes container after testing
 
   # deploy:
   #   needs: build  
