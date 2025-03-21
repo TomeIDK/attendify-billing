@@ -30,13 +30,14 @@ jobs:
 
       - name: Build Docker Image for FOSSBilling 
         run: |
-          docker compose up --build
+          docker compose -f docker/docker-compose.yml up --build
 
-      # run: |
-      #   docker-compose up -d
-      #  sleep 10  # Wait for containers to start
-      # docker ps  # List running containers
-      #docker-compose down # stops and removes container after testing
+      - name: Run Docker Containers
+        run: |
+          docker-compose -f docker/docker-compose.yml up -d
+          sleep 10  # Wait for containers to start
+          docker ps  # List running containers
+          docker-compose -f docker/docker-compose.yml down # stops and removes container after testing
 
   # deploy:
   #   needs: build  
