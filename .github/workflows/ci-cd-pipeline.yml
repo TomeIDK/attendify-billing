@@ -32,12 +32,11 @@ jobs:
         run: |
           docker compose up --build
 
-      - name: Run Tests
-        run: |
-          docker-compose up -d
-          sleep 10  # Wait for containers to start
-          docker ps  # List running containers
-          docker-compose down # stops and removes container after testing
+      # run: |
+      #   docker-compose up -d
+      #  sleep 10  # Wait for containers to start
+      # docker ps  # List running containers
+      #docker-compose down # stops and removes container after testing
 
   # deploy:
   #   needs: build  
@@ -49,3 +48,20 @@ jobs:
   #           git pull origin main  # Pull the latest changes from the repository
   #           docker-compose up --build -d  # Rebuild and restart containers
   #           docker system prune -f  # Clean up old images
+
+  test-php:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+
+      - name: Run Simple PHP Script
+        run: |
+          echo "Running test.php"
+          php test.php
