@@ -1,0 +1,39 @@
+services:
+  fossbilling:
+    image: fossbilling/fossbilling:latest
+    restart: always
+    ports:
+      - "90:80"  # Changed to 8080 to avoid conflicts with other services
+    volumes:
+      - fossbilling_data:/var/www/html
+    depends_on:
+      - mysql
+      # - rabbitmq
+
+  mysql:
+    image: mysql:8.2
+    restart: always
+    environment:
+      MYSQL_DATABASE: fossbilling
+      MYSQL_USER: fossbilling
+      MYSQL_PASSWORD: fossbilling
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   restart: always
+  #   ports:
+  #     - "5672:5672"  # AMQP port
+  #     - "15672:15672"  # Management UI port
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-fossbilling}
+  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-fossbilling}
+  #   volumes:
+  #     - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  fossbilling_data:
+  mysql_data:
+  # rabbitmq_data:
