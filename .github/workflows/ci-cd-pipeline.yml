@@ -64,4 +64,4 @@ jobs:
       - name: Run Simple PHP Script
         run: |
           echo "Running test.php"
-          php test.php
+          php Test/UnitTest/test.php
