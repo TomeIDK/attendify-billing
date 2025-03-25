@@ -6,6 +6,8 @@ services:
       - "90:80"  # Changed to 8080 to avoid conflicts with other services
     volumes:
       - fossbilling_data:/var/www/html
+      - ./crontab:/etc/cron.d/fossbilling-cron
+
     depends_on:
       - mysql
       # - rabbitmq
@@ -21,19 +23,19 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   restart: always
-  #   ports:
-  #     - "5672:5672"  # AMQP port
-  #     - "15672:15672"  # Management UI port
-  #   environment:
-  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-fossbilling}
-  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-fossbilling}
-  #   volumes:
-  #     - rabbitmq_data:/var/lib/rabbitmq
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: always
+    ports:
+      - "5672:5672"  # AMQP port
+      - "15672:15672"  # Management UI port
+    environment:
+     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-fossbilling}
+     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-fossbilling}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
 volumes:
   fossbilling_data:
   mysql_data:
-  # rabbitmq_data:
+  rabbitmq_data:
