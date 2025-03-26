@@ -1,6 +1,31 @@
-composer.phar
+# Composer dependencies
 /vendor/
+/consumers/vendor/
+/producers/vendor/
+/docker/vendor/
+composer.phar
 
-# Commit your application's lock file https://getcomposer.org/doc/01-basic-usage.md#commit-your-composer-lock-file-to-version-control
-# You may choose to ignore a library lock file http://getcomposer.org/doc/02-libraries.md#lock-file
-# composer.lock
+# Composer lock files (optional, but recommended to commit for applications)
+# /composer.lock
+# /consumers/composer.lock
+# /producers/composer.lock
+# /docker/composer.lock
+
+# Environment files (if you add them later)
+.env
+.env.local
+
+# Docker volumes and data
+docker/data/
+mysql_data/
+rabbitmq_data/
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# OS specific files
+.DS_Store
+Thumbs.db
