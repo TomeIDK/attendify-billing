@@ -19,6 +19,7 @@ composer.phar
 docker/data/
 mysql_data/
 rabbitmq_data/
+volumes/
 
 # IDE specific files
 .idea/
