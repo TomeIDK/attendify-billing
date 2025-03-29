@@ -88,27 +88,6 @@ $xml = '
 ';
 
 
-$userData = [
-    'status' => 'active',
-    'group_id' => 1,  // You might need to adjust this based on your FOSSBilling groups
-    'email' => 'Bilal.belkasem@gmail.com',  // Updated email format
-    'first_name' => 'Bilal',
-    'last_name' => 'Belkasem',
-    'company' => 'souls inc.',
-    'address_1' => 'la nigrillo anarctito',
-    'address_2' => 'Bombardino crocodilo',
-    'city' => 'Columbus',
-    'state' => 'Ohio',
-    'country' => 'US',  // Country code
-    'postcode' => '170025',
-    'phone_cc' => '56',  // Country calling code for Netherlands
-    'phone' => '254876156',
-    'currency' => 'USD',
-    'password' => 'SecurePassword123!',
-    'password_confirm' => 'SecurePassword123!'  // Added password_confirm
-];
-
-
 $jsonData = xmlToJson($xml);
 echo "JSON output:\n" . $jsonData . "\n\n";
 
