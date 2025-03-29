@@ -4,6 +4,7 @@
 /producers/vendor/
 /docker/vendor/
 composer.phar
+volumes
 
 # Composer lock files (optional, but recommended to commit for applications)
 # /composer.lock

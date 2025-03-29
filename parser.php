@@ -20,7 +20,7 @@ function xmlToJson($xmlString) {
  * @param array  $data The data to convert.
  * @param SimpleXMLElement $xml The current XML node.
  */
-function arrayToXml(array $data, SimpleXMLElement &$xml) {
+function arrayToXml(array $data, SimpleXMLElement $xml) {
     foreach ($data as $key => $value) {
         // if key is numeric, use a generic element name
         if (is_numeric($key)) {
@@ -74,8 +74,8 @@ function JsonToxml($jsonString) {
 $xml = '
 <attendify>
     <info>
-        <sender>Name of service</sender> Example: crm
-        <operation>name of operation</operation> Example create,update or delete
+        <sender>Name of service</sender>
+        <operation>name of operation</operation>
     </info>
     <user>
         <first_name>Pieter</first_name>
@@ -87,12 +87,33 @@ $xml = '
 </attendify>
 ';
 
+$array = [
+    "info" => [
+        "sender" => "billing",
+        "operation" => "create",
+    ],
+    "user" => [
+        "first_name" => "Cedric",
+        "last_name" => "Pas",
+        "email" => "test@test.com",
+        "title" => "Mr.",
+        "password" => "test123"
+    ]
+];
 
-$jsonData = xmlToJson($xml);
+$xmlRoot = new SimpleXMLElement("<attendify/>");
+arrayToXml($array, $xmlRoot);
+
+echo "Array to XML:\n" . $xmlRoot->asXML() . "\n\n";
+
+
+
+
+
+$jsonData = xmlToJson($xmlRoot->asXML());
 echo "JSON output:\n" . $jsonData . "\n\n";
 
 $xmlOutput = JsonToxml($jsonData);
 echo "XML output:\n" . $xmlOutput . "\n";
 
 ?>
- 
