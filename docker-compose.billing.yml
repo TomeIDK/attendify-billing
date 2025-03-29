@@ -1,0 +1,57 @@
+networks:
+  billing_net:
+    driver: bridge
+  attendify_net:
+    external: true
+
+services:
+  fossbilling:
+    image: fossbilling/fossbilling:latest
+    restart: always
+    ports:
+      - 8081:80
+    volumes:
+      - fossbilling:/var/www/html
+    networks:
+      - billing_net
+  mysql:
+    image: mysql:8.2
+    restart: always
+    environment:
+      MYSQL_DATABASE: fossbilling
+      MYSQL_USER: fossbilling
+      MYSQL_PASSWORD: fossbilling
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    volumes:
+      - ./volumes/mysql:/var/lib/mysql
+    networks:
+      - billing_net
+  billing-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    container_name: billing_consumer
+    depends_on:
+      - rabbitmq
+      - fossbilling
+      - mysql
+    restart: always
+    networks:
+      - attendify_net
+      - billing_net
+  billing-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.producer
+    container_name: billing_producer
+    depends_on:
+      - rabbitmq
+      - fossbilling
+      - mysql
+    networks:
+      - attendify_net
+      - billing_net
+    
+
+volumes:
+  fossbilling:
