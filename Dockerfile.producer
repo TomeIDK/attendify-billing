@@ -1,0 +1,50 @@
+# use official php image
+FROM php:8.3-cli
+
+# install dependecies
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    libpq-dev \
+    librabbitmq-dev \
+    curl \
+    libcurl4-openssl-dev \
+    zip \
+    unzip \
+    git \
+    && docker-php-ext-install \
+    sockets \
+    curl \
+    pdo \
+    pdo_mysql \
+    pdo_pgsql 
+
+# install composer
+# COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# install composer manually
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+
+# install amqp extension for rabbitmq
+RUN pecl install amqp && docker-php-ext-enable amqp
+
+# set work directory
+WORKDIR /app
+
+# copy composer files
+COPY producers/composer.json producers/composer.lock ./
+
+# install composer dependencies
+RUN composer install --no-dev --prefer-dist --no-progress
+
+# copy producers code
+COPY producers/ /app
+
+# copy utility files
+COPY parser.php /app
+
+# grant permissions
+# RUN chown -R www-data:www-data /app
+
+# set entrypoint
+CMD ["php", "test_producer.php"]
