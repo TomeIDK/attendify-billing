@@ -24,6 +24,7 @@ services:
       MYSQL_RANDOM_ROOT_PASSWORD: '1'
     volumes:
       - ./volumes/mysql:/var/lib/mysql
+      - ./scripts:/docker-entrypoint-initdb.d
     networks:
       - billing_net
   billing-consumer:
