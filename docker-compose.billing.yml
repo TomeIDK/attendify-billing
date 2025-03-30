@@ -60,6 +60,7 @@ services:
       - billing-producer
       - billing-consumer
     networks:
+      - attendify_net
       - billing_net
 
 volumes:

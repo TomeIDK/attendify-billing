@@ -12,23 +12,23 @@ $services = [
         'name' => 'billing-producer',
         'host' => 'attendify-billing-producer-1',  // matches container_name in docker-compose
         'port' => 80,
-        'type' => 'http'
+        'type' => 'tcp'
     ],
     [
         'name' => 'billing-consumer',
         'host' => 'attendify-billing-consumer-1',  // matches container_name in docker-compose
         'port' => 80,
-        'type' => 'http'
+        'type' => 'tcp'
     ],
     [
         'name' => 'fossbilling',
-        'host' => 'attendify-billing-fossbilling-1',  // default docker-compose name
+        'host' => 'attendify-fossbilling-1',  // default docker-compose name
         'port' => 80,
-        'type' => 'http'
+        'type' => 'tcp'
     ],
     [
         'name' => 'mysql',
-        'host' => 'attendify-billing-mysql-1',  // default docker-compose name
+        'host' => 'attendify-mysql-1',  // default docker-compose name
         'port' => 3306,
         'type' => 'tcp'
     ]
@@ -104,15 +104,14 @@ function sendHeartbeat($channel, $service, $status, $error) {
 }
 
 
-function startHeartbeatService() {
-    global $services;
+function startHeartbeatService($services) {
     
     // Connect to RabbitMQ using Docker service name
     $connection = new AMQPStreamConnection(
         'rabbitmq',  // matches container_name in docker-compose
         5672,           // port
         'attendify',    // username from docker-compose
-        getenv('RABBITMQ_PASSWORD') ?: 'uXe5u1oWkh32JyLA', // password from env
+        'uXe5u1oWkh32JyLA', // password from env
         'attendify'     // vhost from docker-compose
     );
     $channel = $connection->channel();
@@ -138,10 +137,10 @@ function startHeartbeatService() {
             try {
                 if (!$connection->isConnected()) {
                     $connection = new AMQPStreamConnection(
-                        'some-rabbit',
+                        'rabbitmq',
                         5672,
                         'attendify',
-                        getenv('RABBITMQ_PASSWORD') ?: 'guest',
+                        'uXe5u1oWkh32JyLA',
                         'attendify'
                     );
                     $channel = $connection->channel();
@@ -159,17 +158,17 @@ function startHeartbeatService() {
 }
 
 // Simple test mode - just check services without RabbitMQ
-if (isset($argv[1]) && $argv[1] === 'test') {
-    echo "Testing service status...\n";
-    foreach ($services as $service) {
-        $result = checkServiceStatus($service);
-        echo "Service: {$service['name']}\n";
-        echo "Status: {$result['status']}\n";
-        if ($result['error']) {
-            echo "Error: {$result['error']}\n";
-        }
-        echo "-------------------\n";
-    }
-} else {
-    startHeartbeatService();
-}
+// if (isset($argv[1]) && $argv[1] === 'test') {
+//     echo "Testing service status...\n";
+//     foreach ($services as $service) {
+//         $result = checkServiceStatus($service);
+//         echo "Service: {$service['name']}\n";
+//         echo "Status: {$result['status']}\n";
+//         if ($result['error']) {
+//             echo "Error: {$result['error']}\n";
+//         }
+//         echo "-------------------\n";
+//     }
+// } else {
+    startHeartbeatService($services);
+// }

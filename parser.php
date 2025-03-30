@@ -71,49 +71,49 @@ function JsonToxml($jsonString) {
 
 
 // Example usage
-$xml = '
-<attendify>
-    <info>
-        <sender>Name of service</sender>
-        <operation>name of operation</operation>
-    </info>
-    <user>
-        <first_name>Pieter</first_name>
-        <last_name>Doe</last_name>
-        <email>test@test.com</email>
-        <title>mr</title>
-        <password>Hashed password</password>
-    </user>
-</attendify>
-';
+// $xml = '
+// <attendify>
+//     <info>
+//         <sender>Name of service</sender>
+//         <operation>name of operation</operation>
+//     </info>
+//     <user>
+//         <first_name>Pieter</first_name>
+//         <last_name>Doe</last_name>
+//         <email>test@test.com</email>
+//         <title>mr</title>
+//         <password>Hashed password</password>
+//     </user>
+// </attendify>
+// ';
 
-$array = [
-    "info" => [
-        "sender" => "billing",
-        "operation" => "create",
-    ],
-    "user" => [
-        "first_name" => "Cedric",
-        "last_name" => "Pas",
-        "email" => "test@test.com",
-        "title" => "Mr.",
-        "password" => "test123"
-    ]
-];
+// $array = [
+//     "info" => [
+//         "sender" => "billing",
+//         "operation" => "create",
+//     ],
+//     "user" => [
+//         "first_name" => "Cedric",
+//         "last_name" => "Pas",
+//         "email" => "test@test.com",
+//         "title" => "Mr.",
+//         "password" => "test123"
+//     ]
+// ];
 
-$xmlRoot = new SimpleXMLElement("<attendify/>");
-arrayToXml($array, $xmlRoot);
+// $xmlRoot = new SimpleXMLElement("<attendify/>");
+// arrayToXml($array, $xmlRoot);
 
-echo "Array to XML:\n" . $xmlRoot->asXML() . "\n\n";
-
-
+// echo "Array to XML:\n" . $xmlRoot->asXML() . "\n\n";
 
 
 
-$jsonData = xmlToJson($xmlRoot->asXML());
-echo "JSON output:\n" . $jsonData . "\n\n";
 
-$xmlOutput = JsonToxml($jsonData);
-echo "XML output:\n" . $xmlOutput . "\n";
+
+// $jsonData = xmlToJson($xmlRoot->asXML());
+// echo "JSON output:\n" . $jsonData . "\n\n";
+
+// $xmlOutput = JsonToxml($jsonData);
+// echo "XML output:\n" . $xmlOutput . "\n";
 
 ?>
