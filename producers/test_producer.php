@@ -9,7 +9,7 @@ define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // mysql credentials
-$host       = '172.18.0.2';
+$host       = 'mysql';
 $db         = 'fossbilling';
 $user       = 'fossbilling';
 $pass       = 'fossbilling';
@@ -25,7 +25,7 @@ $options = [
 $pdo = new PDO($dsn, $user, $pass, $options);
 
 // rabbitmq credentials
-$connection = new AMQPStreamConnection('172.19.0.2', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
+$connection = new AMQPStreamConnection('rabbitmq', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
 $channel = $connection->channel();
 echo " [x] Connected to RabbitMQ.\n";
 
@@ -33,6 +33,7 @@ echo " [x] Connected to RabbitMQ.\n";
 pcntl_signal(SIGINT, function() use ($channel, $connection) {
     shutdownHandler($channel, $connection);
 });
+echo " [*] Polling the user_events. Press CTRL+C to exit.\n";
 
 while (true) {
 
@@ -69,7 +70,7 @@ function processRow($userData, $operation, $channel) {
             echo " [*] Creating '{$operation}' message...\n";
             $xmlString = formatUser($userData);
             publishMessage($xmlString, $channel);
-            echo " [✔] $operation message sent with user data (XML format):\n$xmlString\n";
+            echo " [✔] $operation message sent with user data (XML format)\n";
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Skipping...";

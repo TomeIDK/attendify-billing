@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     pdo \
     pdo_mysql \
-    pdo_pgsql
+    pdo_pgsql \
+    pcntl
 
 # install composer
 # COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

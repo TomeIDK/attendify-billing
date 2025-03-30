@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require  'parser.php';
+require 'parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -27,9 +27,9 @@ $connection = new AMQPStreamConnection('rabbitmq', 5672, 'attendify', 'uXe5u1oWk
 $channel    = $connection->channel();
 
 // close connection if shutdown command is given (CTRL+C)
-// pcntl_signal(SIGINT, function() use ($channel, $connection) {
-//     shutdownHandler($channel, $connection);
-// });
+pcntl_signal(SIGINT, function() use ($channel, $connection) {
+    shutdownHandler($channel, $connection);
+});
 
 // CONSUMER CALLBACK
 $callback = function (AMQPMessage $msg) use ($pdo) {
@@ -37,19 +37,19 @@ $callback = function (AMQPMessage $msg) use ($pdo) {
     try {
         // Parse de XML naar JSON en decoderen naar een array
         $jsonData = xmlToJson($msg->getBody());
-        echo $jsonData . "\n";
         $array = json_decode($jsonData, true);
-        echo " [x] Parsed data:\n" . print_r($array, true) . "\n";
+        echo " [x] Parsed data.\n";
         $data = $array['attendify'];
     } catch (Exception $e) {
         echo " [!] Error parsing XML: " . $e->getMessage() . "\n";
         return;
     }
+        echo " [x] Message sender is '{$data['info']['sender']}'\n";
 
     // skip message if we are the sender
     if ($data['info']['sender'] == 'billing') {
-        echo " [x] Message sender is '{$data['info']['sender']}'. Skipping...";
-        $msg->ack();
+        echo " Skipping...\n";
+        // $msg->ack();
         return;
     }
 
