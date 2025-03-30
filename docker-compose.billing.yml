@@ -31,7 +31,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.consumer
-    container_name: billing_consumer
     depends_on:
       - rabbitmq
       - fossbilling
@@ -44,7 +43,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.producer
-    container_name: billing_producer
     depends_on:
       - rabbitmq
       - fossbilling
