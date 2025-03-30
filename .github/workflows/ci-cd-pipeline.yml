@@ -4,23 +4,23 @@ on:
   push:
     branches:
       - dev
-      - main  # Trigger the pipeline on pushes to the "main" or "def" branch
+      - main
   pull_request:
     branches:
-      - main  # Trigger the pipeline on pull requests to the "main" branch
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # GitHub Actions runs the CI jobs on Ubuntu
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository #Fetch latest code from repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
       
-      - name: "Debug: Docker" #Debugging step to display Docker information
+      - name: "Debug: Docker"
         run: docker info
         
-      - name: "Debug: System Info" #Extra debugging step to display system status
+      - name: "Debug: System Info"
         run: |
           whoami 
           groups
@@ -28,27 +28,16 @@ jobs:
           pwd
           ls
 
-      - name: Build Docker Image for FOSSBilling 
+      - name: Build Docker Images
         run: |
-          docker compose -f docker/docker-compose.yml up --build
+          docker compose -f docker/docker-compose.yml build
 
-      - name: Run Docker Containers
+      - name: Run and Test Docker Containers
         run: |
-          docker-compose -f docker/docker-compose.yml up -d
+          docker compose -f docker/docker-compose.yml up -d
           sleep 10  # Wait for containers to start
           docker ps  # List running containers
-          docker-compose -f docker/docker-compose.yml down # stops and removes container after testing
-
-  # deploy:
-  #   needs: build  
-  #   runs-on: development VM
-
-  #   steps:
-  #     - name: deploy fossbilling
-  #       run: |
-  #           git pull origin main  # Pull the latest changes from the repository
-  #           docker-compose up --build -d  # Rebuild and restart containers
-  #           docker system prune -f  # Clean up old images
+          docker compose -f docker/docker-compose.yml down # stops and removes container after testing
 
   test-php:
     runs-on: ubuntu-latest
