@@ -69,7 +69,7 @@ function processRow($userData, $operation, $channel) {
         case 'DELETE':
             echo " [*] Creating '{$operation}' message...\n";
             $xmlString = formatUser($userData);
-            publishMessage($xmlString, $channel);
+            publishMessage($xmlString, $channel, $operation);
             echo " [✔] $operation message sent with user data (XML format)\n";
             break;
         default:
@@ -110,13 +110,26 @@ function formatUser($userData) {
 }
 
 // publish the xml message to rabbitmq
-function publishMessage($xmlString, $channel) {
+function publishMessage($xmlString, $channel, $operation) {
     $msg = new AMQPMessage(
         $xmlString,
         ['content-type' => 'application/xml']
     );
-
-    $channel->basic_publish($msg, 'user-management', 'user.register');
+    switch ($operation) {
+        case 'CREATE':
+            $channel->basic_publish($msg, 'user-management', 'user.register');
+            break;
+        case 'UPDATE':
+            $channel->basic_publish($msg, 'user-management', 'user.update');
+            break;
+        case 'DELETE':
+            $channel->basic_publish($msg, 'user-management', 'user.delete');
+            break;
+        default:
+            echo " [!] Error: Unknown operation '{$operation}'. Canceled message publishing.";
+            return;
+            break;
+    }
 }
 
 // mark row as processed
