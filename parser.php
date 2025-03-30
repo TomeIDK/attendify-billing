@@ -1,94 +1,119 @@
 <?php
 
-class AttendifyXMLParser
-{
-    public function parseMessage($xmlString)
-    {
-        try {
-            // Remove any whitespace between tags
-            $xmlString = preg_replace('/>\s+</', '><', trim($xmlString));
-            $xml = new SimpleXMLElement($xmlString);
-            
-            // Create the structured JSON format
-            $result = [
-                'info' => [
-                    'sender' => (string)$xml->info->sender,
-                    'operation' => (string)$xml->info->operation
-                ],
-                'user' => [
-                    'id' => (string)$xml->user->id,
-                    'first_name' => (string)$xml->user->first_name,
-                    'last_name' => (string)$xml->user->last_name,
-                    'date_of_birth' => (string)$xml->user->date_of_birth,
-                    'phone_number' => trim((string)$xml->user->phone_number),
-                    'title' => trim((string)$xml->user->title),
-                    'email' => (string)$xml->user->email,
-                    'password' => (string)$xml->user->password,
-                    'address' => [
-                        'street' => (string)$xml->user->address->street,
-                        'number' => (string)$xml->user->address->number,
-                        'bus_number' => (string)$xml->user->address->bus_number,
-                        'city' => (string)$xml->user->address->city,
-                        'province' => (string)$xml->user->address->province,
-                        'country' => (string)$xml->user->address->country,
-                        'postal_code' => (string)$xml->user->address->postal_code
-                    ],
-                    'payment_details' => [
-                        'facturation_address' => [
-                            'street' => (string)$xml->user->payment_details->facturation_address->street,
-                            'number' => (string)$xml->user->payment_details->facturation_address->number,
-                            'company_bus_number' => (string)$xml->user->payment_details->facturation_address->company_bus_number,
-                            'city' => (string)$xml->user->payment_details->facturation_address->city,
-                            'province' => (string)$xml->user->payment_details->facturation_address->province,
-                            'country' => (string)$xml->user->payment_details->facturation_address->country,
-                            'postal_code' => (string)$xml->user->payment_details->facturation_address->postal_code
-                        ],
-                        'payment_method' => (string)$xml->user->payment_details->payment_method,
-                        'card_number' => (string)$xml->user->payment_details->card_number
-                    ],
-                    'email_registered' => $this->parseBoolean((string)$xml->user->email_registered),
-                    'company' => [
-                        'id' => trim((string)$xml->user->company->id),
-                        'name' => (string)$xml->user->company->name,
-                        'VAT_number' => (string)$xml->user->company->VAT_number,
-                        'address' => [
-                            'street' => (string)$xml->user->company->address->street,
-                            'number' => (string)$xml->user->company->number,
-                            'city' => (string)$xml->user->company->address->city,
-                            'province' => (string)$xml->user->company->address->province,
-                            'country' => (string)$xml->user->company->address->country,
-                            'postal_code' => (string)$xml->user->company->address->postal_code
-                        ]
-                    ],
-                    'from_company' => $this->parseBoolean((string)$xml->user->from_company)
-                ]
-            ];
-            
-            return json_encode($result, JSON_PRETTY_PRINT);
-            
-        } catch (Exception $e) {
-            throw new Exception("Error parsing Attendify XML: " . $e->getMessage());
+/**
+ * Convert XML string to pretty-printed JSON.
+ *
+ * @param string $xmlString The XML data as a string.
+ * @return string The JSON encoded data.
+ */
+function xmlToJson($xmlString) {
+    $xmlObject = simplexml_load_string($xmlString);
+    // Wrap the XML object in an array with the root element name as key
+    $wrapped = [$xmlObject->getName() => $xmlObject];
+
+    return json_encode($wrapped, JSON_PRETTY_PRINT);
+}
+
+/**
+ * Recursively converts an array to XML nodes.
+ *
+ * @param array  $data The data to convert.
+ * @param SimpleXMLElement $xml The current XML node.
+ */
+function arrayToXml(array $data, SimpleXMLElement $xml) {
+    foreach ($data as $key => $value) {
+        // if key is numeric, use a generic element name
+        if (is_numeric($key)) {
+            $key = 'item';
         }
-    }
-    
-    private function parseBoolean($value)
-    {
-        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        if (is_array($value)) {
+            $subnode = $xml->addChild($key);
+            arrayToXml($value, $subnode);
+        } else {
+            // Convert value to string and add as child
+            $xml->addChild($key, htmlspecialchars($value));
+        }
     }
 }
 
-// Example usage with RabbitMQ
-$parser = new AttendifyXMLParser();
+/**
+ * Convert JSON string to formatted XML using the root from JSON.
+ *
+ * @param string $jsonString The JSON data as a string.
+ * @return string The formatted XML string.
+ */
+function JsonToxml($jsonString) {
+    // Decode the JSON string into an associative array
+    $data = json_decode($jsonString, true);
 
-// When receiving message from RabbitMQ
-$callback = function ($msg) use ($parser) {
-    try {
-        $jsonData = $parser->parseMessage($msg->body);
-        // Now you can use $jsonData with FOSSBilling
-        // Store in database or process further
-        
-    } catch (Exception $e) {
-        // Handle error
-        echo "Error: " . $e->getMessage();
-    }
-};
+    // Extract the root element dynamically
+    $rootElement = key($data); // Get the first key of the array (root element)
+    $rootData = $data[$rootElement]; // Get the inner data
+
+    // Create the XML structure using the detected root element
+    $xml = new SimpleXMLElement("<$rootElement/>");
+
+    // Recursively convert the array to XML nodes
+    arrayToXml($rootData, $xml);
+
+    // Convert to a DOMDocument for formatting
+    $dom = new DOMDocument("1.0", "UTF-8");
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    $dom->loadXML($xml->asXML());
+
+    // Return the formatted XML as a string
+    return $dom->saveXML();
+}
+
+
+
+
+
+// Example usage
+$xml = '
+<attendify>
+    <info>
+        <sender>Name of service</sender>
+        <operation>name of operation</operation>
+    </info>
+    <user>
+        <first_name>Pieter</first_name>
+        <last_name>Doe</last_name>
+        <email>test@test.com</email>
+        <title>mr</title>
+        <password>Hashed password</password>
+    </user>
+</attendify>
+';
+
+$array = [
+    "info" => [
+        "sender" => "billing",
+        "operation" => "create",
+    ],
+    "user" => [
+        "first_name" => "Cedric",
+        "last_name" => "Pas",
+        "email" => "test@test.com",
+        "title" => "Mr.",
+        "password" => "test123"
+    ]
+];
+
+$xmlRoot = new SimpleXMLElement("<attendify/>");
+arrayToXml($array, $xmlRoot);
+
+echo "Array to XML:\n" . $xmlRoot->asXML() . "\n\n";
+
+
+
+
+
+$jsonData = xmlToJson($xmlRoot->asXML());
+echo "JSON output:\n" . $jsonData . "\n\n";
+
+$xmlOutput = JsonToxml($jsonData);
+echo "XML output:\n" . $xmlOutput . "\n";
+
+?>
