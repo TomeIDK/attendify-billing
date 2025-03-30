@@ -11,39 +11,33 @@ use PhpAmqpLib\Message\AMQPMessage;
 $services = [
     [
         'name' => 'billing-producer',
-        'host' => 'localhost',
+        'host' => 'billing-producer',
         'port' => 8080,  
         'type' => 'http'
     ],
     [
         'name' => 'billing-consumer',
-        'host' => 'localhost',
+        'host' => 'billing-consumer',
         'port' => 8080,  
         'type' => 'http'
     ],
     [
         'name' => 'fossbilling',
-        'host' => 'localhost',
+        'host' => 'fossbilling',
         'port' => 8081,  
         'type' => 'http'
     ],
     [
         'name' => 'mysql',
-        'host' => 'localhost',
+        'host' => 'mysql',
         'port' => 3306,  
         'type' => 'tcp'
     ],
     [
         'name' => 'rabbitmq',
-        'host' => 'localhost',
+        'host' => 'rabbitmq',
         'port' => 5672,  
         'type' => 'tcp'
-    ],
-    [
-        'name' => 'rabbitmq-management',
-        'host' => 'localhost',
-        'port' => 15672,  
-        'type' => 'http'
     ]
 ];
 

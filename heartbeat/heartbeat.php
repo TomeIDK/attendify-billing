@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/vendor/autoload.php';
+require 'parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -9,13 +10,13 @@ use PhpAmqpLib\Message\AMQPMessage;
 $services = [
     [
         'name' => 'billing-producer',
-        'host' => 'billing_producer',  // matches container_name in docker-compose
+        'host' => 'attendify-billing-producer-1',  // matches container_name in docker-compose
         'port' => 80,
         'type' => 'http'
     ],
     [
         'name' => 'billing-consumer',
-        'host' => 'billing_consumer',  // matches container_name in docker-compose
+        'host' => 'attendify-billing-consumer-1',  // matches container_name in docker-compose
         'port' => 80,
         'type' => 'http'
     ],
@@ -29,12 +30,6 @@ $services = [
         'name' => 'mysql',
         'host' => 'attendify-billing-mysql-1',  // default docker-compose name
         'port' => 3306,
-        'type' => 'tcp'
-    ],
-    [
-        'name' => 'rabbitmq',
-        'host' => 'some-rabbit',  // matches container_name in docker-compose
-        'port' => 5672,
         'type' => 'tcp'
     ]
 ];
@@ -74,40 +69,57 @@ function checkServiceStatus($service) {
 }
 
 function sendHeartbeat($channel, $service, $status, $error) {
-    // Define the XML data based on the schema
-    $timestamp = time();
-    $xmlData = '
-    <heartbeat xmlns="http://attendify-billing.local">
-        <service>' . $service . '</service>
-        <timestamp>' . $timestamp . '</timestamp>
-        <error>' . $error . '</error>
-        <status>' . $status . '</status>
-    </heartbeat>';
+    if ($status == 'down') {
+        echo " [x] Service '$service' is down: $error\n";
+        return;
+    }
+
+// format user data to compatible format for rabbitmq
+    $formattedHeartbeat = [
+        "info" => [
+            "sender" => 'billing',
+            "container_name" => $service,
+            "timestamp" => time(),
+        ]
+    ];
+
+    // convert formatted user to xml
+    $xml = new SimpleXMLElement("<attendify/>");
+    arrayToXml($formattedHeartbeat, $xml);
+
+    // format xml
+    $dom = new DOMDocument("1.0");
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    $dom->loadXML($xml->asXML());
+
+    $xmlString = $dom->saveXML();
 
     // Create XML message
-    $message = new AMQPMessage($xmlData, ['content_type' => 'text/xml']);
+    $message = new AMQPMessage($xmlString, ['content_type' => 'application/xml']);
 
     // Publish to monitoring exchange with routing key
     $channel->basic_publish($message, 'monitoring', 'monitoring.heartbeat');
-    echo "Heartbeat sent for $service at " . date('Y-m-d H:i:s') . " Status: $status\n";
+    echo " [✔] Heartbeat sent for '$service' at " . date('Y-m-d H:i:s') . ". Status: $status\n";
 }
+
 
 function startHeartbeatService() {
     global $services;
     
     // Connect to RabbitMQ using Docker service name
     $connection = new AMQPStreamConnection(
-        'localhost',  // matches container_name in docker-compose
+        'rabbitmq',  // matches container_name in docker-compose
         5672,           // port
         'attendify',    // username from docker-compose
-        getenv('RABBITMQ_PASSWORD') ?: 'guest', // password from env
+        getenv('RABBITMQ_PASSWORD') ?: 'uXe5u1oWkh32JyLA', // password from env
         'attendify'     // vhost from docker-compose
     );
     $channel = $connection->channel();
 
     $channel->exchange_declare('monitoring', 'topic', false, true, false);
 
-    echo "Heartbeat service started!\n";
+    echo " [x] Heartbeat service started!\n";
 
     // Poll every second
     while (true) {
@@ -119,7 +131,7 @@ function startHeartbeatService() {
             }
             sleep(1);
         } catch (\Exception $e) {
-            echo "Error in heartbeat service: " . $e->getMessage() . "\n";
+            echo " [!] Error in heartbeat service: " . $e->getMessage() . "\n";
             sleep(1);
             
             // Try to reconnect if connection was lost
@@ -136,7 +148,7 @@ function startHeartbeatService() {
                     $channel->exchange_declare('monitoring', 'topic', false, true, false);
                 }
             } catch (\Exception $reconnectException) {
-                echo "Failed to reconnect: " . $reconnectException->getMessage() . "\n";
+                echo " [!] Failed to reconnect: " . $reconnectException->getMessage() . "\n";
             }
         }
     }

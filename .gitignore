@@ -2,6 +2,7 @@
 /vendor/
 /consumers/vendor/
 /producers/vendor/
+/heartbeat/vendor/
 /docker/vendor/
 composer.phar
 volumes
