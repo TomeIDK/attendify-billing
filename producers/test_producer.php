@@ -1,90 +1,134 @@
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
+require 'parser.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
-// Update credentials to match docker-compose.yml
-$connection = new AMQPStreamConnection('localhost', 5672, 'user', 'password', 'vhost');
-$channel = $connection->channel();
+define("INTERVAL", 5); // interval between db polling
+declare(ticks = 1); // signal handling for pcntl_signal
 
+// mysql credentials
+$host       = '172.18.0.2';
+$db         = 'fossbilling';
+$user       = 'fossbilling';
+$pass       = 'fossbilling';
+$charset    = 'utf8mb4';
+$port       = 3306; 
 
-// Updated user data with a valid email format
-$userData = [
-    'id' => '12345', 
-    'first_name' => 'Bilal',
-    'last_name' => 'Belkasem',
-    'date_of_birth' => '1990-01-01', // Example DOB
-    'phone_number' => '+3212345678',
-    'title' => 'Developer',
-    'email' => 'Bilal.belkasem@gmail.com',
-    'password' => 'SecurePassword123!',
-    'email_registered' => 'true',
-    'from_company' => 'false',
-    
-    'address' => [
-        'street' => 'la nigrillo anarctito',
-        'number' => '42',
-        'bus_number' => 'B',
-        'city' => 'Columbus',
-        'province' => 'Ohio',
-        'country' => 'US',
-        'postal_code' => '170025'
-    ],
-
-    'company' => [
-        'id' => 'COM001',
-        'name' => 'souls inc.',
-        'VAT_number' => 'BE987654321',
-        'address' => [
-            'street' => 'Corporate Avenue',
-            'number' => '10',
-            'city' => 'Ghent',
-            'province' => 'East Flanders',
-            'country' => 'Belgium',
-            'postal_code' => '9000'
-        ]
-    ]
+// create pdo instance
+$dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ];
+$pdo = new PDO($dsn, $user, $pass, $options);
 
-// Add debug output
-echo "[*] Sending user data: " . json_encode($userData, JSON_PRETTY_PRINT) . "\n";
+// rabbitmq credentials
+$connection = new AMQPStreamConnection('172.19.0.2', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
+$channel = $connection->channel();
+echo " [x] Connected to RabbitMQ.\n";
 
-function arrayToXml($data, $xml) {
-    foreach ($data as $key => $value) {
-        if (is_array($value)) {
-            $subnode = $xml->addChild($key);
-            arrayToXml($value, $subnode);
-        } else {
-            $xml->addChild($key, htmlspecialchars($value));
+// close connection if shutdown command is given (CTRL+C)
+pcntl_signal(SIGINT, function() use ($channel, $connection) {
+    shutdownHandler($channel, $connection);
+});
+
+while (true) {
+
+    // fetch all unprocessed user events
+    $statement = $pdo->prepare("SELECT * FROM user_events WHERE processed = FALSE");
+
+    // poll user_events table and process any unprocessed rows
+    try {
+        $statement->execute();
+        $count = $statement->rowCount();
+        echo " [x] Found {$count} unprocessed user event(s).\n";
+
+        // process each row individually and publish a message
+        while ($row = $statement->fetch()) {
+            echo " [*] Currently processing user #{$row['id']}: {$row['first_name']} {$row['last_name']} for {$row['operation']} operation.\n";
+            if ($row['operation'] == 'INSERT'){
+                $row['operation'] = 'CREATE';
+            }
+            processRow($row, $row['operation'], $channel);
+            markAsProcessed($row['id'], $pdo);
         }
+    } catch (PDOException $e) {
+        echo " [!] Database error: " . $e->getMessage() . "\n";
+    }
+    sleep(INTERVAL);
+}
+
+// process user data 
+function processRow($userData, $operation, $channel) {
+    switch ($operation) {
+        case 'CREATE':
+        case 'UPDATE':
+        case 'DELETE':
+            echo " [*] Creating '{$operation}' message...\n";
+            $xmlString = formatUser($userData);
+            publishMessage($xmlString, $channel);
+            echo " [✔] $operation message sent with user data (XML format):\n$xmlString\n";
+            break;
+        default:
+            echo " [!] Error: Unknown operation '{$operation}'. Skipping...";
+            return;
+            break;
     }
 }
 
-$xml = new SimpleXMLElement('<attendify></attendify>');
-$info = $xml->addChild('info');
-$info->addChild('sender', 'billing');
-$info->addChild('operation', 'create');
+// format user data to compatible format for rabbitmq
+function formatUser($userData) {
+    // format user data
+    $formattedUser = [
+        "info" => [
+            "sender" => 'billing',
+            "operation" => strtolower($userData['operation']),
+        ],
+        "user" => [
+            "first_name" => $userData['first_name'],
+            "last_name" => $userData['last_name'],
+            "email" => $userData['email'],
+            "title" => $userData['title'],
+            "pass" => $userData['pass']
+        ]
+    ];
 
+    // convert formatted user to xml
+    $xml = new SimpleXMLElement("<attendify/>");
+    arrayToXml($formattedUser, $xml);
 
-$user = $xml->addChild('user');
-arrayToXml($userData, $user);
+    // format xml
+    $dom = new DOMDocument("1.0");
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    $dom->loadXML($xml->asXML());
 
-// remove manually set fields
-unset($userData['sender'], $userData['operation']);
+    return $dom->saveXML();
+}
 
-$xmlString = $xml->asXML();
+// publish the xml message to rabbitmq
+function publishMessage($xmlString, $channel) {
+    $msg = new AMQPMessage(
+        $xmlString,
+        ['content-type' => 'application/xml']
+    );
 
-// Convert to JSON
-$msg = new AMQPMessage(
-    $xmlString,
-    ['content-type' => 'application/xml']
-);
+    $channel->basic_publish($msg, 'user-management', 'user.register');
+}
 
-// Publish message
-$channel->basic_publish($msg, 'user-management', 'user.register');
+// mark row as processed
+function markAsProcessed($id, $pdo) {
+    $stmt = $pdo->prepare("UPDATE user_events SET processed = 1 WHERE id = :id");
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+}
 
-echo "[✔] Message sent with user data (XML format):\n$xmlString\n";
-
-$channel->close();
-$connection->close();
+// shutdown command handler
+function shutdownHandler($channel, $connection) {
+    echo " [x] Closing RabbitMQ connection...\n";
+    $channel->close();
+    $connection->close();
+    exit(0);
+};
