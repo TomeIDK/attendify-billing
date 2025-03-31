@@ -48,4 +48,4 @@ COPY parser.php /app
 # RUN chown -R www-data:www-data /app
 
 # set entrypoint
-CMD ["php", "test_producer.php"]
+CMD ["php", "user_producer.php"]
