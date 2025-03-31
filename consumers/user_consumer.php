@@ -99,6 +99,9 @@ function createUser(array $data, PDO $pdo) {
     $currentTime = date('Y-m-d H:i:s');
     // $address1 = buildAddress($data['address']);
 
+    // set session variable to indicate consumer is making the change
+    $pdo->exec("SET @is_consumer_source = 1");
+
     $sql = "INSERT INTO client (
                 email, pass, first_name, last_name, custom_1, created_at, updated_at
             ) VALUES (

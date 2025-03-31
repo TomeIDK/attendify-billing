@@ -18,8 +18,10 @@ CREATE TRIGGER after_user_insert
 AFTER INSERT ON client
 FOR EACH ROW
 BEGIN
-    INSERT INTO user_events (operation, first_name, last_name, email, title, pass)
-    VALUES ('INSERT', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.pass);
+    IF COALESCE(@is_consumer_source, 0) <> 1 THEN
+        INSERT INTO user_events (operation, first_name, last_name, email, title, pass)
+        VALUES ('INSERT', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.pass);
+    END IF;
 END$$
 
 -- update trigger
@@ -27,8 +29,10 @@ CREATE TRIGGER after_user_update
 AFTER UPDATE ON client
 FOR EACH ROW
 BEGIN
-    INSERT INTO user_events (operation, first_name, last_name, email, title, pass)
-    VALUES ('UPDATE', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.pass);
+    IF COALESCE(@is_consumer_source, 0) <> 1 THEN
+        INSERT INTO user_events (operation, first_name, last_name, email, title, pass)
+        VALUES ('UPDATE', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.pass);
+    END IF;
 END$$
 
 -- delete trigger
@@ -36,8 +40,10 @@ CREATE TRIGGER after_user_delete
 AFTER DELETE ON client
 FOR EACH ROW
 BEGIN
-    INSERT INTO user_events (operation, first_name, last_name, email, title, pass)
-    VALUES ('DELETE', OLD.first_name, OLD.last_name, OLD.email, OLD.custom_1, OLD.pass);
+    IF COALESCE(@is_consumer_source, 0) <> 1 THEN
+        INSERT INTO user_events (operation, first_name, last_name, email, title, pass)
+        VALUES ('DELETE', OLD.first_name, OLD.last_name, OLD.email, OLD.custom_1, OLD.pass);
+    END IF;
 END$$
 
 DELIMITER ;
