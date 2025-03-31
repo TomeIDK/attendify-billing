@@ -50,7 +50,7 @@ services:
     networks:
       - attendify_net
       - billing_net
-  heartbeat:
+  billing-heartbeat:
     build:
       context: .
       dockerfile: Dockerfile.heartbeat
