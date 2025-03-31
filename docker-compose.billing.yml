@@ -24,7 +24,6 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./volumes/mysql:/var/lib/mysql
-      # - ./scripts:/docker-entrypoint-initdb.d
     networks:
       - billing_net
   billing-consumer:
