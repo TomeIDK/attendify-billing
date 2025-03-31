@@ -9,7 +9,7 @@ define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // --- DATABASE CONNECTIE via PDO ---
-$host       = 'mysql';
+$host       = 'billing-mysql';
 $db         = 'fossbilling';
 $user       = 'fossbilling';
 $pass       = 'fossbilling';

@@ -9,7 +9,7 @@ define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // mysql credentials
-$host       = 'mysql';
+$host       = 'billing-mysql';
 $db         = 'fossbilling';
 $user       = 'fossbilling';
 $pass       = 'fossbilling';
@@ -25,7 +25,7 @@ $options = [
 $pdo = new PDO($dsn, $user, $pass, $options);
 
 // rabbitmq credentials
-$connection = new AMQPStreamConnection('rabbitmq', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
+$connection = new AMQPStreamConnection('rabbitmq', 30001, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
 $channel = $connection->channel();
 echo " [x] Connected to RabbitMQ.\n";
 
