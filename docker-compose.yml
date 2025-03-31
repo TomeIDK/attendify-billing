@@ -1,6 +1,6 @@
 # TODO: use reverse proxy for security
-include:
-  - docker-compose.billing.yml
+# include:
+#   - docker-compose.billing.yml
 networks:
   attendify_net:
     external: true

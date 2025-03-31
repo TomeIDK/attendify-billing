@@ -9,22 +9,22 @@ services:
     image: fossbilling/fossbilling:latest
     restart: always
     ports:
-      - 8081:80
+      - 30056:80
     volumes:
       - fossbilling:/var/www/html
     networks:
       - billing_net
-  mysql:
+  billing-mysql:
     image: mysql:8.2
     restart: always
     environment:
       MYSQL_DATABASE: fossbilling
       MYSQL_USER: fossbilling
-      MYSQL_PASSWORD: fossbilling
-      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./volumes/mysql:/var/lib/mysql
-      - ./scripts:/docker-entrypoint-initdb.d
+      # - ./scripts:/docker-entrypoint-initdb.d
     networks:
       - billing_net
   billing-consumer:
@@ -34,7 +34,7 @@ services:
     depends_on:
       - rabbitmq
       - fossbilling
-      - mysql
+      - billing-mysql
     restart: always
     networks:
       - attendify_net
@@ -46,7 +46,7 @@ services:
     depends_on:
       - rabbitmq
       - fossbilling
-      - mysql
+      - billing-mysql
     networks:
       - attendify_net
       - billing_net
@@ -56,7 +56,7 @@ services:
       dockerfile: Dockerfile.heartbeat
     depends_on:
       - fossbilling
-      - mysql
+      - billing-mysql
       - billing-producer
       - billing-consumer
     networks:
