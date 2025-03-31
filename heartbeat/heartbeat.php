@@ -27,8 +27,8 @@ $services = [
         'type' => 'tcp'
     ],
     [
-        'name' => 'billing-mysql',
-        'host' => 'attendify-billing-mysql-1',  // default docker-compose name
+        'name' => 'mysql',
+        'host' => 'attendify-mysql-1',  // default docker-compose name
         'port' => 3306,
         'type' => 'tcp'
     ]

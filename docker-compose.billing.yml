@@ -14,7 +14,7 @@ services:
       - fossbilling:/var/www/html
     networks:
       - billing_net
-  billing-mysql:
+  mysql:
     image: mysql:8.2
     restart: always
     environment:
@@ -34,7 +34,7 @@ services:
     depends_on:
       - rabbitmq
       - fossbilling
-      - billing-mysql
+      - mysql
     restart: always
     networks:
       - attendify_net
@@ -46,7 +46,7 @@ services:
     depends_on:
       - rabbitmq
       - fossbilling
-      - billing-mysql
+      - mysql
     networks:
       - attendify_net
       - billing_net
@@ -56,7 +56,7 @@ services:
       dockerfile: Dockerfile.heartbeat
     depends_on:
       - fossbilling
-      - billing-mysql
+      - mysql
       - billing-producer
       - billing-consumer
     networks:
