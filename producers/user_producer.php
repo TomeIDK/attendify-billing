@@ -92,7 +92,7 @@ function formatUser($userData) {
             "last_name" => $userData['last_name'],
             "email" => $userData['email'],
             "title" => $userData['title'],
-            "pass" => $userData['pass']
+            "password" => $userData['password']
         ]
     ];
 
