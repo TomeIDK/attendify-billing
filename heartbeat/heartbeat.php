@@ -6,6 +6,9 @@ require 'parser.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->load();
+
 // services to monitor - updated to match docker-compose services
 $services = [
     [
@@ -107,13 +110,7 @@ function sendHeartbeat($channel, $service, $status, $error) {
 function startHeartbeatService($services) {
     
     // Connect to RabbitMQ using Docker service name
-    $connection = new AMQPStreamConnection(
-        'rabbitmq',  // matches container_name in docker-compose
-        5672,           // port
-        'attendify',    // username from docker-compose
-        'uXe5u1oWkh32JyLA', // password from env
-        'attendify'     // vhost from docker-compose
-    );
+    $connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
     $channel = $connection->channel();
 
     $channel->exchange_declare('monitoring', 'topic', false, true, false);
