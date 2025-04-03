@@ -3,6 +3,7 @@
         "php-amqplib/php-amqplib": "^3.7",
         "ext-curl": "*",
         "ext-simplexml": "*",
-        "ext-sockets": "*"
+        "ext-sockets": "*",
+        "vlucas/phpdotenv": "^5.6"
     }
-} 
+}

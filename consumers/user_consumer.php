@@ -5,16 +5,19 @@ require 'parser.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->load();
+
 define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // --- DATABASE CONNECTIE via PDO ---
-$host       = 'mysql';
-$db         = 'fossbilling';
-$user       = 'fossbilling';
-$pass       = 'fossbilling';
+$host       = $_ENV['MYSQL_HOST'];
+$db         = $_ENV['MYSQL_DB'];
+$user       = $_ENV['MYSQL_USER'];
+$pass       = $_ENV['MYSQL_PASSWORD'];
 $charset    = 'utf8mb4';
-$port       = 3306;
+$port       = $_ENV['MYSQL_PORT'];
 $dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -23,7 +26,7 @@ $options = [
 $pdo = new PDO($dsn, $user, $pass, $options);
 
 // --- VERBINDING MET RABBITMQ ---
-$connection = new AMQPStreamConnection('rabbitmq', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
+$connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
 $channel    = $connection->channel();
 
 // close connection if shutdown command is given (CTRL+C)
