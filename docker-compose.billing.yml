@@ -49,18 +49,6 @@ services:
     networks:
       - attendify_net
       - billing_net
-  billing-heartbeat:
-    build:
-      context: .
-      dockerfile: Dockerfile.heartbeat
-    depends_on:
-      - fossbilling
-      - mysql
-      - billing-producer
-      - billing-consumer
-    networks:
-      - attendify_net
-      - billing_net
 
 volumes:
   fossbilling:

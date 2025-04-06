@@ -1,10 +1,10 @@
-# TODO: use reverse proxy for security
+# COMPOSE FILE FOR A LOCAL RABBITMQ INSTANCE
+# THIS FILE SHOULD NOT BE USED IN PRODUCTION
 include:
   - docker-compose.billing.yml
 networks:
   attendify_net:
     external: true
-# rabbitmq does not support secrets
 services:
   rabbitmq:
     image: rabbitmq:4-management
