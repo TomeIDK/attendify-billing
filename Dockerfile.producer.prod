@@ -17,29 +17,23 @@ RUN apt-get update && apt-get install -y \
     pdo \
     pdo_mysql \
     pdo_pgsql \
-    pcntl
+    pcntl \
+    && pecl install amqp && docker-php-ext-enable amqp
 
 # install composer
-# COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# install composer manually
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-
-# install amqp extension for rabbitmq
-RUN pecl install amqp && docker-php-ext-enable amqp
 
 # set work directory
 WORKDIR /app
 
 # copy composer files
-COPY producers/composer.json producers/composer.lock ./
+COPY producers/composer.json producers/composer.lock ./producers/
 
 # install composer dependencies
-RUN composer install --no-dev --prefer-dist --no-progress
+RUN composer install --prefer-dist --no-progress --working-dir=/app/producers
 
 # copy producers code
-COPY producers/ /app
+COPY producers/ /app/producers/
 
 # copy utility files
 COPY parser.php /app
