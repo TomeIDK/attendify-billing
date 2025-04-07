@@ -1,7 +1,8 @@
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
-require 'parser.php';
+require '../parser.php';
+
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 

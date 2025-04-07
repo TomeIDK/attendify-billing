@@ -1,6 +1,7 @@
 <?php
+
 require_once __DIR__ . '/vendor/autoload.php';
-require 'parser.php';
+require '../parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -18,6 +19,8 @@ $user       = $_ENV['MYSQL_USER'];
 $pass       = $_ENV['MYSQL_PASSWORD'];
 $charset    = 'utf8mb4';
 $port       = $_ENV['MYSQL_PORT'];
+
+// create pdo instance
 $dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -28,6 +31,7 @@ $pdo = new PDO($dsn, $user, $pass, $options);
 // --- VERBINDING MET RABBITMQ ---
 $connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
 $channel    = $connection->channel();
+echo " [x] Connected to RabbitMQ.\n";
 
 // close connection if shutdown command is given (CTRL+C)
 pcntl_signal(SIGINT, function() use ($channel, $connection) {
