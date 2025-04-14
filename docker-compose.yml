@@ -3,8 +3,6 @@
 networks:
   billing_net:
     driver: bridge
-  attendify_net:
-    external: true
 services:
   rabbitmq:
     image: rabbitmq:4-management
@@ -20,7 +18,7 @@ services:
     volumes:
       - ./volumes/rabbitmq:/var/lib/rabbitmq
     networks:
-      - attendify_net
+      - billing_net
   fossbilling:
     image: fossbilling/fossbilling:latest
     restart: always
@@ -34,7 +32,7 @@ services:
     image: mysql:8.2
     restart: always
     ports:
-      - "${MYSQL_PORT}:3306"
+      - "${MYSQL_PORT_DOCKER}:3306"
     environment:
       MYSQL_DATABASE: fossbilling
       MYSQL_USER: fossbilling
@@ -57,7 +55,6 @@ services:
       - ./consumers:/app/consumers
       - ./parser.php:/app/parser.php
     networks:
-      - attendify_net
       - billing_net
     env_file:
       - .env
@@ -74,7 +71,6 @@ services:
       - ./producers:/app/producers
       - ./parser.php:/app/parser.php
     networks:
-      - attendify_net
       - billing_net
     env_file:
       - .env
