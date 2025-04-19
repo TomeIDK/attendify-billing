@@ -1,8 +1,9 @@
+# prod compose file
+# includes fossbilling, mysql, pub/sub
+# rabbitmq is not included here, must be available externally at RABBITMQ_HOST
 networks:
   billing_net:
     driver: bridge
-  attendify_net:
-    external: true
 
 services:
   fossbilling:
@@ -29,7 +30,7 @@ services:
   billing-consumer:
     build:
       context: .
-      dockerfile: Dockerfile.consumer
+      dockerfile: Dockerfile.consumer.prod
     depends_on:
       - rabbitmq
       - fossbilling
@@ -38,29 +39,22 @@ services:
     networks:
       - attendify_net
       - billing_net
+    env_file:
+      - .env
   billing-producer:
     build:
       context: .
-      dockerfile: Dockerfile.producer
+      dockerfile: Dockerfile.producer.prod
     depends_on:
       - rabbitmq
       - fossbilling
       - mysql
+    restart: always
     networks:
       - attendify_net
       - billing_net
-  billing-heartbeat:
-    build:
-      context: .
-      dockerfile: Dockerfile.heartbeat
-    depends_on:
-      - fossbilling
-      - mysql
-      - billing-producer
-      - billing-consumer
-    networks:
-      - attendify_net
-      - billing_net
-
+    env_file:
+      - .env
+      
 volumes:
   fossbilling:

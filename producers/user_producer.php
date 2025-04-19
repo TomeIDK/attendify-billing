@@ -1,20 +1,24 @@
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
-require 'parser.php';
+require __DIR__ . '/../parser.php';
+
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
+
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+// $dotenv->load();
 
 define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // mysql credentials
-$host       = 'mysql';
-$db         = 'fossbilling';
-$user       = 'fossbilling';
-$pass       = 'fossbilling';
+$host       = getenv('MYSQL_HOST');
+$db         = getenv('MYSQL_DB');
+$user       = getenv('MYSQL_USER');
+$pass       = getenv('MYSQL_PASSWORD');
 $charset    = 'utf8mb4';
-$port       = 3306; 
+$port       = getenv('MYSQL_PORT');
 
 // create pdo instance
 $dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
@@ -25,7 +29,7 @@ $options = [
 $pdo = new PDO($dsn, $user, $pass, $options);
 
 // rabbitmq credentials
-$connection = new AMQPStreamConnection('rabbitmq', 5672, 'attendify', 'uXe5u1oWkh32JyLA', 'attendify');
+$connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASSWORD'), getenv('RABBITMQ_VHOST'));
 $channel = $connection->channel();
 echo " [x] Connected to RabbitMQ.\n";
 
