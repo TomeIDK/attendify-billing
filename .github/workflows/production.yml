@@ -1,0 +1,32 @@
+name: 🚀 FOSSBilling Pre-Prod Deploy
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: 📦 Build Docker Images
+        run: |
+          docker build -f docker/Dockerfile.consumer.prod -t fossbilling-consumer:latest .
+          docker build -f docker/Dockerfile.producer.prod -t fossbilling-producer:latest .
+
+      - name: 🔐 Setup SSH Key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: 🚀 Deploy to Server via SSH
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no user@your-server << 'EOF'
+            cd /path/to/your/project
+            git pull origin release
+            docker compose -f docker-compose.prod.yml up -d --build
+          EOF
