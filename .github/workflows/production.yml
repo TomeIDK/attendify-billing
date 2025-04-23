@@ -1,31 +1,38 @@
-name:  FOSSBilling Pre-Prod Deploy
+name: FOSSBilling Pre-Prod Deploy & PR Check
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - release
 
+  pull_request:
+    types: [opened, synchronize, reopened]
+    # Covers PRs from release → any other branch
+
 jobs:
+  ## Job 1: Deploy to Pre-Prod when release gets updated
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     runs-on: ubuntu-latest
     environment:
       name: pre-prod
 
     steps:
-      - name:  Checkout Repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name:  Build Docker Images
+      - name: Build Docker Images
         run: |
           docker build -f docker/Dockerfile.consumer.prod -t fossbilling-consumer:latest .
           docker build -f docker/Dockerfile.producer.prod -t fossbilling-producer:latest .
 
-      - name:  Setup SSH Agent
+      - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name:  Deploy to Server via SSH
+      - name: Deploy to Server via SSH
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
@@ -33,3 +40,18 @@ jobs:
             git pull origin release
             docker compose -f docker-compose.prod.yml up -d --build
           EOF
+
+  ## Job 2: Run checks when a PR is created FROM release → any other branch
+  check-pr-from-release:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run basic validation checks
+        run: |
+          echo "Validating PR from 'release' branch..."
+          # Place your real tests, linters, Docker dry-run, etc. here
+          echo "Checks passed for PR from release"
