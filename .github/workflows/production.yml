@@ -26,8 +26,8 @@ jobs:
 
       - name: Build Docker Images
         run: |
-          docker build -f docker/Dockerfile.consumer.prod -t fossbilling-consumer:latest .
-          docker build -f docker/Dockerfile.producer.prod -t fossbilling-producer:latest .
+          docker build -f Dockerfile.consumer.prod -t fossbilling-consumer:latest .
+          docker build -f Dockerfile.producer.prod -t fossbilling-producer:latest .
 
       - name: Setup SSH Agent
         uses: webfactory/ssh-agent@v0.8.0

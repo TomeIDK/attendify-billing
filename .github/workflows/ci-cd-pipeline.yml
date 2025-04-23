@@ -37,7 +37,7 @@ jobs:
           docker compose -f docker/docker-compose.yml up -d
           sleep 10  # Wait for containers to start
           docker ps  # List running containers
-          docker compose -f docker/docker-compose.yml down # stops and removes container after testing
+          docker compose -f docker-compose.yml down # stops and removes container after testing
 
   test-php:
     runs-on: ubuntu-latest
