@@ -27,9 +27,9 @@ jobs:
 
       - name:  Deploy to Server via SSH
         run: |
-          ssh -o StrictHostKeyChecking=no user@${{ secrets.DNS_NAME }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
-            cd /path/to/your/project
+            cd /root/billing/attendify-billing
             git pull origin release
             docker compose -f docker-compose.prod.yml up -d --build
           EOF
