@@ -51,7 +51,14 @@ jobs:
         with:
           php-version: '8.0'
 
-      - name: Run Simple PHP Script
+      - name: Install PHPUnit
         run: |
-          echo "Running test.php"
-          php Test/UnitTest/Test.php
+          curl -sS https://getcomposer.org/installer | php
+           php composer.phar require --dev phpunit/phpunit:^9
+  
+      - name: Run Unit Test
+        run: |
+           echo "Running ParserTest.php"
+           php vendor/bin/phpunit Test/UnitTest/ParserTest.php
+
+
