@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../parser.php';
 
 use PHPUnit\Framework\TestCase;
 
-class SimplifiedParserTest extends TestCase
+class ParserTest extends TestCase
 {
     public function testXmlToJson()
     {
