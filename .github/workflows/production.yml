@@ -5,19 +5,17 @@ on:
   push:
     branches:
       - release
-      - main
 
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
       - release
-      - main
     # Covers PRs from release → any other branch
 
 jobs:
   ## Job 1: Deploy to Pre-Prod when release gets updated
   deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/release' || github.ref == 'refs/heads/main') ## remove main after testing
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release '
     runs-on: ubuntu-latest
     environment:
       name: pre-prod
@@ -47,7 +45,7 @@ jobs:
 
   ## Job 2: Run checks when a PR is created FROM release → any other branch
   check-pr-from-release:
-    if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'release' || github.event.pull_request.head.ref == 'main') ### remove main after complete
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release'
     runs-on: ubuntu-latest
 
     steps:
