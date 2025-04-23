@@ -80,7 +80,7 @@ class SimplifiedParserTest extends TestCase
                 }
             }
         }';
-        $expectedXml = '<?xml version="1.0"?>
+        $ExpectedXml = '<?xml version="1.0"?>
                             <attendify>
                             <info>
                                 <sender>billing</sender>
@@ -97,11 +97,11 @@ class SimplifiedParserTest extends TestCase
 
 
         // Convert JSON to XML
-        $actualXml = JsonToxml($fakeJson);
+        $ActualXml = JsonToxml($fakeJson);
         
         // Print both expected and actual XML for comparison
         echo "Expected XML:\n" . $ExpectedXml . "\n\n";
-        echo "Actual XML:\n" . $actualXml . "\n\n";
+        echo "Actual XML:\n" . $ActualXml . "\n\n";
                 
         
         // Compare the actual XML content with expected XML content
