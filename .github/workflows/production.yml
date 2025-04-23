@@ -1,4 +1,4 @@
-name: 🚀 FOSSBilling Pre-Prod Deploy
+name:  FOSSBilling Pre-Prod Deploy
 
 on:
   push:
@@ -8,24 +8,27 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: pre-prod
 
     steps:
-      - name: 📥 Checkout Repository
+      - name:  Checkout Repository
         uses: actions/checkout@v3
 
-      - name: 📦 Build Docker Images
+      - name:  Build Docker Images
         run: |
           docker build -f docker/Dockerfile.consumer.prod -t fossbilling-consumer:latest .
           docker build -f docker/Dockerfile.producer.prod -t fossbilling-producer:latest .
 
-      - name: 🔐 Setup SSH Key
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
-          chmod 600 key.pem
+      - name:  Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: 🚀 Deploy to Server via SSH
+      - name:  Deploy to Server via SSH
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no user@your-server << 'EOF'
+          ssh -o StrictHostKeyChecking=no user@${{ secrets.DNS_NAME }} << 'EOF'
+            set -e
             cd /path/to/your/project
             git pull origin release
             docker compose -f docker-compose.prod.yml up -d --build
