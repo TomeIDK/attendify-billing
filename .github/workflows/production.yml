@@ -15,7 +15,7 @@ on:
 jobs:
   ## Job 1: Deploy to Pre-Prod when release gets updated
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release '
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     runs-on: ubuntu-latest
     environment:
       name: pre-prod
@@ -23,6 +23,17 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Verify Docker Compose
+        run: |
+          if [ ! -f "docker-compose.prod.yml" ]; then
+            echo "Error: docker-compose.prod.yml not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile.consumer.prod" ] || [ ! -f "Dockerfile.producer.prod" ]; then
+            echo "Error: Required Dockerfiles not found"
+            exit 1
+          fi
 
       - name: Build Docker Images
         run: |
@@ -34,6 +45,10 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Verify Server Connection
+        run: |
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} "echo 'Connection successful'"
+
       - name: Deploy to Server via SSH
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
@@ -41,16 +56,43 @@ jobs:
             cd /root/billing/attendify-billing
             git pull origin release
             docker compose -f docker-compose.prod.yml up -d --build
+            sleep 10
+            docker ps | grep fossbilling
+          EOF
+
+      - name: Verify Deployment
+        run: |
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
+            set -e
+            if ! docker ps | grep -q "fossbilling"; then
+              echo "Error: Services not running after deployment"
+              exit 1
+            fi
           EOF
 
   ## Job 2: Run checks when a PR is created FROM release → any other branch
-  check-pr-from-release:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'release'
+  Pull-requests:
+    if: github.event_name == 'pull_request' && (github.base.ref == 'release' || github.head.ref == 'release')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Verify Required Files
+        run: |
+          if [ ! -f "docker-compose.prod.yml" ]; then
+            echo "Error: docker-compose.prod.yml not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile.consumer.prod" ] || [ ! -f "Dockerfile.producer.prod" ]; then
+            echo "Error: Required Dockerfiles not found"
+            exit 1
+          fi
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose -f docker-compose.prod.yml config
 
       - name: Run basic validation checks
         run: |
