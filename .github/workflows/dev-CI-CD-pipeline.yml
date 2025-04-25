@@ -128,7 +128,7 @@ jobs:
       - name: Verify Deployment
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
             if ! docker ps | grep -q "fossbilling"; then
               echo "Error: Services not running after deployment"
