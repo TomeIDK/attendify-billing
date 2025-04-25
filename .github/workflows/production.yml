@@ -76,6 +76,11 @@ jobs:
           docker build -f Dockerfile.consumer.prod -t fossbilling-consumer:latest .
           docker build -f Dockerfile.producer.prod -t fossbilling-producer:latest .
 
+
+      - name: Ensure Docker Network Exists
+        run: |
+          docker network create attendify_net || true
+
       - name: Test Docker Compose Configuration
         run: |
           docker compose -f docker-compose.prod.yml --env-file .env config
