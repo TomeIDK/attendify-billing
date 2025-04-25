@@ -59,7 +59,7 @@ jobs:
           EOF
 
       - name: Setup Production Environment
-        if: ${{ !inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           # Create production .env file with actual secrets
           cat > .env << EOF
@@ -92,18 +92,18 @@ jobs:
           echo "Docker compose configuration is valid"
 
       - name: Setup SSH Agent
-        if: ${{ !inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Verify Server Connection
-        if: ${{ !inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} "echo 'Connection successful'"
 
       - name: Deploy to Server via SSH
-        if: ${{ !inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           # Copy .env file to server
           scp -o StrictHostKeyChecking=no .env student@${{ secrets.DNS_NAME }}:/root/billing/attendify-billing/
@@ -130,12 +130,12 @@ jobs:
           rm -f .env
 
       - name: Cleanup Production Environment
-        if: ${{ !inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           rm -f .env
 
       - name: Verify Deployment
-        if: ${{ !inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e

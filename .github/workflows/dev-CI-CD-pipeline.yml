@@ -58,10 +58,10 @@ jobs:
           cat > .env << EOF
           MYSQL_DATABASE=fossbilling_dev
           MYSQL_USER=fossbilling_dev
-          MYSQL_PASSWORD=${{ secrets.DEV_MYSQL_PASSWORD }}
-          MYSQL_ROOT_PASSWORD=${{ secrets.DEV_MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           RABBITMQ_DEFAULT_USER=fossbilling_dev
-          RABBITMQ_DEFAULT_PASS=${{ secrets.DEV_RABBITMQ_DEFAULT_PASS }}
+          RABBITMQ_DEFAULT_PASS=${{ secrets.RABBITMQ_DEFAULT_PASS }}
           EOF
 
       - name: Create Test Docker Network
@@ -87,19 +87,19 @@ jobs:
         if: ${{ !inputs.test_mode }}
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Verify Server Connection
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} "echo 'Connection successful'"
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} "echo 'Connection successful'"
 
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          scp -o StrictHostKeyChecking=no .env student@${{ secrets.DEV_DNS_NAME }}:/root/billing/attendify-billing-dev/
+          scp -o StrictHostKeyChecking=no .env student@${{ secrets.DNS_NAME }}:/root/billing/attendify-billing-dev/
           
-          ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
             cd /root/billing/attendify-billing-dev
             git pull origin main
@@ -128,7 +128,7 @@ jobs:
       - name: Verify Deployment
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
             if ! docker ps | grep -q "fossbilling"; then
               echo "Error: Services not running after deployment"
