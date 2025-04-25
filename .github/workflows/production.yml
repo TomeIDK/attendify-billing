@@ -2,10 +2,15 @@ name: FOSSBilling Pre-Prod Deploy & PR Check
 
 on:
   workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Run in test mode (skip deployment)'
+        required: true
+        type: boolean
+        default: false
   push:
     branches:
       - release
-
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
@@ -15,7 +20,7 @@ on:
 jobs:
   ## Job 1: Deploy to Pre-Prod when release gets updated
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: pre-prod
@@ -40,16 +45,24 @@ jobs:
           docker build -f Dockerfile.consumer.prod -t fossbilling-consumer:latest .
           docker build -f Dockerfile.producer.prod -t fossbilling-producer:latest .
 
+      - name: Test Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.prod.yml config
+          echo "Docker compose configuration is valid"
+
       - name: Setup SSH Agent
+        if: ${{ !inputs.test_mode }}
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Verify Server Connection
+        if: ${{ !inputs.test_mode }}
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} "echo 'Connection successful'"
 
       - name: Deploy to Server via SSH
+        if: ${{ !inputs.test_mode }}
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
@@ -60,7 +73,14 @@ jobs:
             docker ps | grep fossbilling
           EOF
 
+      - name: Test Mode - Skip Deployment
+        if: ${{ inputs.test_mode }}
+        run: |
+          echo "Running in test mode - deployment steps skipped"
+          echo "All build and configuration checks passed"
+
       - name: Verify Deployment
+        if: ${{ !inputs.test_mode }}
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
