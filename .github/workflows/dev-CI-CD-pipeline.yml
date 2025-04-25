@@ -104,7 +104,7 @@ jobs:
           
           ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
-            cd /root/billing/attendify-billing-dev
+            cd /home/student/attendify-billing-dev
             git pull origin main
             docker compose -f docker-compose.yml up -d --build
             sleep 10
