@@ -12,7 +12,8 @@ volumes
 # /consumers/composer.lock
 # /producers/composer.lock
 # /docker/composer.lock
-
+Test/UnitTest/vendor
+Test/UnitTest/composer.lock
 # Environment files (if you add them later)
 .env
 .env.local

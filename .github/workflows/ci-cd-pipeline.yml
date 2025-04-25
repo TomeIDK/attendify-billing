@@ -30,14 +30,14 @@ jobs:
 
       - name: Build Docker Images
         run: |
-          docker compose -f docker/docker-compose.yml build
+          docker compose -f docker-compose.yml build
 
       - name: Run and Test Docker Containers
         run: |
-          docker compose -f docker/docker-compose.yml up -d
+          docker compose -f docker-compose.yml up -d
           sleep 10  # Wait for containers to start
           docker ps  # List running containers
-          docker compose -f docker/docker-compose.yml down # stops and removes container after testing
+          docker compose -f docker-compose.yml down # stops and removes container after testing
 
   test-php:
     runs-on: ubuntu-latest
@@ -51,7 +51,14 @@ jobs:
         with:
           php-version: '8.0'
 
-      - name: Run Simple PHP Script
+      - name: Install PHPUnit
         run: |
-          echo "Running test.php"
-          php Test/UnitTest/Test.php
+          curl -sS https://getcomposer.org/installer | php
+           php composer.phar require --dev phpunit/phpunit:^9
+  
+      - name: Run Unit Test
+        run: |
+           echo "Running ParserTest.php"
+           php vendor/bin/phpunit Test/UnitTest/ParserTest.php
+
+
