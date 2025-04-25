@@ -19,11 +19,16 @@ on:
 
 jobs:
   ## Job 1: Deploy to Pre-Prod when release gets updated
+
+  
+
   deploy:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: pre-prod
+    env:
+      TEST_MODE: ${{ github.event.inputs.test_mode == 'true' }}
 
     steps:
       - name: Checkout Repository
@@ -41,7 +46,7 @@ jobs:
           fi
 
       - name: Create Test Environment
-        if: ${{ inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           # Create a test .env file with dummy values for testing
           cat > .env << EOF
@@ -67,7 +72,7 @@ jobs:
           EOF
 
       - name: Create Test Docker Network
-        if: ${{ inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           docker network create attendify_net || true
 
@@ -113,13 +118,13 @@ jobs:
           EOF
 
       - name: Test Mode - Skip Deployment
-        if: ${{ inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           echo "Running in test mode - deployment steps skipped"
           echo "All build and configuration checks passed"
 
       - name: Cleanup Test Environment
-        if: ${{ inputs.test_mode }}
+        if: env.TEST_MODE == 'true'
         run: |
           docker network rm attendify_net || true
           rm -f .env
