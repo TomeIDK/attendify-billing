@@ -31,8 +31,8 @@ jobs:
 
       - name: Verify Docker Compose
         run: |
-          if [ ! -f "docker-compose.dev.yml" ]; then
-            echo "Error: docker-compose.dev.yml not found"
+          if [ ! -f "docker-compose.yml" ]; then
+            echo "Error: docker-compose.yml not found"
             exit 1
           fi
           if [ ! -f "Dockerfile.consumer.dev" ] || [ ! -f "Dockerfile.producer.dev" ]; then
@@ -67,20 +67,20 @@ jobs:
       - name: Create Test Docker Network
         if: env.TEST_MODE == 'true'
         run: |
-          docker network create attendify_dev_net || true
+          docker network create attendify_net || true
 
       - name: Build Docker Images
         run: |
-          docker build -f Dockerfile.consumer.dev -t fossbilling-consumer-dev:latest .
-          docker build -f Dockerfile.producer.dev -t fossbilling-producer-dev:latest .
+          docker build -f Dockerfile.consumer.dev -t fossbilling-consumer:latest .
+          docker build -f Dockerfile.producer.dev -t fossbilling-producer:latest .
 
       - name: Ensure Docker Network Exists
         run: |
-          docker network create attendify_dev_net || true
+          docker network create attendify_net || true
 
       - name: Test Docker Compose Configuration
         run: |
-          docker compose -f docker-compose.dev.yml --env-file .env config
+          docker compose -f docker-compose.yml --env-file .env config
           echo "Docker compose configuration is valid"
 
       - name: Setup SSH Agent
@@ -103,9 +103,9 @@ jobs:
             set -e
             cd /root/billing/attendify-billing-dev
             git pull origin main
-            docker compose -f docker-compose.dev.yml up -d --build
+            docker compose -f docker-compose.yml up -d --build
             sleep 10
-            docker ps | grep fossbilling-dev
+            docker ps | grep fossbilling
           EOF
 
       - name: Test Mode - Skip Deployment
@@ -117,7 +117,7 @@ jobs:
       - name: Cleanup Test Environment
         if: env.TEST_MODE == 'true'
         run: |
-          docker network rm attendify_dev_net || true
+          docker network rm attendify_net || true
           rm -f .env
 
       - name: Cleanup Development Environment
@@ -130,7 +130,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} << 'EOF'
             set -e
-            if ! docker ps | grep -q "fossbilling-dev"; then
+            if ! docker ps | grep -q "fossbilling"; then
               echo "Error: Services not running after deployment"
               exit 1
             fi
@@ -157,12 +157,12 @@ jobs:
 
       - name: Create Test Docker Network
         run: |
-          docker network create attendify_dev_net || true
+          docker network create attendify_net || true
 
       - name: Verify Required Files
         run: |
-          if [ ! -f "docker-compose.dev.yml" ]; then
-            echo "Error: docker-compose.dev.yml not found"
+          if [ ! -f "docker-compose.yml" ]; then
+            echo "Error: docker-compose.yml not found"
             exit 1
           fi
           if [ ! -f "Dockerfile.consumer.dev" ] || [ ! -f "Dockerfile.producer.dev" ]; then
@@ -172,11 +172,11 @@ jobs:
 
       - name: Validate Docker Compose
         run: |
-          docker compose -f docker-compose.dev.yml --env-file .env config
+          docker compose -f docker-compose.yml --env-file .env config
 
       - name: Cleanup Test Environment
         run: |
-          docker network rm attendify_dev_net || true
+          docker network rm attendify_net || true
           rm -f .env
 
       - name: Run basic validation checks
