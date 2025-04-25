@@ -1,0 +1,186 @@
+name: FOSSBilling Dev Deploy & PR Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Run in test mode (skip deployment)'
+        required: true
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+    env:
+      TEST_MODE: ${{ github.event.inputs.test_mode == 'true' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Verify Docker Compose
+        run: |
+          if [ ! -f "docker-compose.dev.yml" ]; then
+            echo "Error: docker-compose.dev.yml not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile.consumer.dev" ] || [ ! -f "Dockerfile.producer.dev" ]; then
+            echo "Error: Required Dockerfiles not found"
+            exit 1
+          fi
+
+      - name: Create Test Environment
+        if: env.TEST_MODE == 'true'
+        run: |
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling_dev
+          MYSQL_USER=fossbilling_dev
+          MYSQL_PASSWORD=test_password
+          MYSQL_ROOT_PASSWORD=test_root_password
+          RABBITMQ_DEFAULT_USER=fossbilling_dev
+          RABBITMQ_DEFAULT_PASS=test_rabbit_pass
+          EOF
+
+      - name: Setup Development Environment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling_dev
+          MYSQL_USER=fossbilling_dev
+          MYSQL_PASSWORD=${{ secrets.DEV_MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.DEV_MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_DEFAULT_USER=fossbilling_dev
+          RABBITMQ_DEFAULT_PASS=${{ secrets.DEV_RABBITMQ_DEFAULT_PASS }}
+          EOF
+
+      - name: Create Test Docker Network
+        if: env.TEST_MODE == 'true'
+        run: |
+          docker network create attendify_dev_net || true
+
+      - name: Build Docker Images
+        run: |
+          docker build -f Dockerfile.consumer.dev -t fossbilling-consumer-dev:latest .
+          docker build -f Dockerfile.producer.dev -t fossbilling-producer-dev:latest .
+
+      - name: Ensure Docker Network Exists
+        run: |
+          docker network create attendify_dev_net || true
+
+      - name: Test Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.dev.yml --env-file .env config
+          echo "Docker compose configuration is valid"
+
+      - name: Setup SSH Agent
+        if: ${{ !inputs.test_mode }}
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+
+      - name: Verify Server Connection
+        if: ${{ !inputs.test_mode }}
+        run: |
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} "echo 'Connection successful'"
+
+      - name: Deploy to Development Server
+        if: ${{ !inputs.test_mode }}
+        run: |
+          scp -o StrictHostKeyChecking=no .env student@${{ secrets.DEV_DNS_NAME }}:/root/billing/attendify-billing-dev/
+          
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} << 'EOF'
+            set -e
+            cd /root/billing/attendify-billing-dev
+            git pull origin main
+            docker compose -f docker-compose.dev.yml up -d --build
+            sleep 10
+            docker ps | grep fossbilling-dev
+          EOF
+
+      - name: Test Mode - Skip Deployment
+        if: env.TEST_MODE == 'true'
+        run: |
+          echo "Running in test mode - deployment steps skipped"
+          echo "All build and configuration checks passed"
+
+      - name: Cleanup Test Environment
+        if: env.TEST_MODE == 'true'
+        run: |
+          docker network rm attendify_dev_net || true
+          rm -f .env
+
+      - name: Cleanup Development Environment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          rm -f .env
+
+      - name: Verify Deployment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          ssh -o StrictHostKeyChecking=no student@${{ secrets.DEV_DNS_NAME }} << 'EOF'
+            set -e
+            if ! docker ps | grep -q "fossbilling-dev"; then
+              echo "Error: Services not running after deployment"
+              exit 1
+            fi
+          EOF
+
+  Pull-requests:
+    if: github.event_name == 'pull_request' && (github.base.ref == 'main' || github.head.ref == 'main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Create Test Environment
+        run: |
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling_dev
+          MYSQL_USER=fossbilling_dev
+          MYSQL_PASSWORD=test_password
+          MYSQL_ROOT_PASSWORD=test_root_password
+          RABBITMQ_DEFAULT_USER=fossbilling_dev
+          RABBITMQ_DEFAULT_PASS=test_rabbit_pass
+          EOF
+
+      - name: Create Test Docker Network
+        run: |
+          docker network create attendify_dev_net || true
+
+      - name: Verify Required Files
+        run: |
+          if [ ! -f "docker-compose.dev.yml" ]; then
+            echo "Error: docker-compose.dev.yml not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile.consumer.dev" ] || [ ! -f "Dockerfile.producer.dev" ]; then
+            echo "Error: Required Dockerfiles not found"
+            exit 1
+          fi
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose -f docker-compose.dev.yml --env-file .env config
+
+      - name: Cleanup Test Environment
+        run: |
+          docker network rm attendify_dev_net || true
+          rm -f .env
+
+      - name: Run basic validation checks
+        run: |
+          echo "Validating PR from 'main' branch..."
+          # Place your real tests, linters, Docker dry-run, etc. here
+          echo "Checks passed for PR from main"
