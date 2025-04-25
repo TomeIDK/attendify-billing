@@ -40,6 +40,37 @@ jobs:
             exit 1
           fi
 
+      - name: Create Test Environment
+        if: ${{ inputs.test_mode }}
+        run: |
+          # Create a test .env file with dummy values for testing
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling
+          MYSQL_USER=fossbilling
+          MYSQL_PASSWORD=test_password
+          MYSQL_ROOT_PASSWORD=test_root_password
+          RABBITMQ_DEFAULT_USER=fossbilling
+          RABBITMQ_DEFAULT_PASS=test_rabbit_pass
+          EOF
+
+      - name: Setup Production Environment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          # Create production .env file with actual secrets
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling
+          MYSQL_USER=fossbilling
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_DEFAULT_USER=fossbilling
+          RABBITMQ_DEFAULT_PASS=${{ secrets.RABBITMQ_DEFAULT_PASS }}
+          EOF
+
+      - name: Create Test Docker Network
+        if: ${{ inputs.test_mode }}
+        run: |
+          docker network create attendify_net || true
+
       - name: Build Docker Images
         run: |
           docker build -f Dockerfile.consumer.prod -t fossbilling-consumer:latest .
@@ -47,7 +78,7 @@ jobs:
 
       - name: Test Docker Compose Configuration
         run: |
-          docker compose -f docker-compose.prod.yml config
+          docker compose -f docker-compose.prod.yml --env-file .env config
           echo "Docker compose configuration is valid"
 
       - name: Setup SSH Agent
@@ -64,6 +95,9 @@ jobs:
       - name: Deploy to Server via SSH
         if: ${{ !inputs.test_mode }}
         run: |
+          # Copy .env file to server
+          scp -o StrictHostKeyChecking=no .env student@${{ secrets.DNS_NAME }}:/root/billing/attendify-billing/
+          
           ssh -o StrictHostKeyChecking=no student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
             cd /root/billing/attendify-billing
@@ -78,6 +112,17 @@ jobs:
         run: |
           echo "Running in test mode - deployment steps skipped"
           echo "All build and configuration checks passed"
+
+      - name: Cleanup Test Environment
+        if: ${{ inputs.test_mode }}
+        run: |
+          docker network rm attendify_net || true
+          rm -f .env
+
+      - name: Cleanup Production Environment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          rm -f .env
 
       - name: Verify Deployment
         if: ${{ !inputs.test_mode }}
@@ -99,6 +144,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Create Test Environment
+        run: |
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling
+          MYSQL_USER=fossbilling
+          MYSQL_PASSWORD=test_password
+          MYSQL_ROOT_PASSWORD=test_root_password
+          RABBITMQ_DEFAULT_USER=fossbilling
+          RABBITMQ_DEFAULT_PASS=test_rabbit_pass
+          EOF
+
+      - name: Create Test Docker Network
+        run: |
+          docker network create attendify_net || true
+
       - name: Verify Required Files
         run: |
           if [ ! -f "docker-compose.prod.yml" ]; then
@@ -112,7 +172,12 @@ jobs:
 
       - name: Validate Docker Compose
         run: |
-          docker compose -f docker-compose.prod.yml config
+          docker compose -f docker-compose.prod.yml --env-file .env config
+
+      - name: Cleanup Test Environment
+        run: |
+          docker network rm attendify_net || true
+          rm -f .env
 
       - name: Run basic validation checks
         run: |
