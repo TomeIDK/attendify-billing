@@ -97,31 +97,38 @@ jobs:
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
-            set -e
-            echo 'Student1' | sudo -S bash << 'INNER'
-            mkdir -p /root/billing/attendify-billing
+          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@*** << 'EOF'
 
-           if [ -f /home/student/.env ]; then
-             mv /home/student/.env /root/billing/attendify-billing/.env
+            set -e
+            echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing
+
+            if [ -f /home/student/.env ]; then
+              echo 'Student1' | sudo -S mv /home/student/.env /root/billing/attendify-billing/.env
             else
               echo "Warning: /home/student/.env not found. Skipping move."
-             fi
+            fi
 
-            cd /root/billing/attendify-billing
+            echo 'Student1' | sudo -S bash -c '
+              set -e
+              cd /root/billing/attendify-billing
 
-            git pull origin main
+            if [ ! -d ".git" ]; then
+              echo "No git repo found here. Exiting."
+              exit 1
+            fi
+
+            git pull --rebase --stat --verbose origin main || { echo "Git pull failed."; exit 1; }
 
             if [ ! -f "docker-compose.yml" ]; then
               echo "Error: docker-compose.yml not found in repo"
               exit 1
-             fi
+            fi
 
             docker compose -f docker-compose.yml up -d --build
             sleep 10
 
             docker ps | grep *** || (echo "Docker containers not running!" && exit 1)
-            INNER
+            '
             EOF
 
       - name: Test Mode - Skip Deployment
