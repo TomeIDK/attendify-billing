@@ -97,7 +97,7 @@ jobs:
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
             echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing
 
@@ -129,8 +129,7 @@ jobs:
 
               docker ps | grep billing-consumer || docker ps | grep billing-producer || { echo "Billing containers not running!"; docker compose logs --tail=100; exit 1; }
             '
-            exit 0
-          ENDSSH
+          EOF
 
       - name: Test Mode - Skip Deployment
         if: env.TEST_MODE == 'true'
