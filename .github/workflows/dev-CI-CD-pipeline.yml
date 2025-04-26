@@ -102,7 +102,11 @@ jobs:
             echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing
         
               
-            sudo mv /home/student/.env /root/billing/attendify-billing/.env
+            if [ -f /home/student/.env ]; then
+              sudo mv /home/student/.env /root/billing/attendify-billing/.env
+            else
+              echo "Warning: /home/student/.env not found. Skipping move."
+            fi
         
             cd /root/billing/attendify-billing
         
