@@ -99,31 +99,30 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
-            echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing
-        
-              
-            if [ -f /home/student/.env ]; then
-              sudo mv /home/student/.env /root/billing/attendify-billing/.env
+            echo 'Student1' | sudo -S bash << 'INNER'
+            mkdir -p /root/billing/attendify-billing
+
+           if [ -f /home/student/.env ]; then
+             mv /home/student/.env /root/billing/attendify-billing/.env
             else
               echo "Warning: /home/student/.env not found. Skipping move."
-            fi
-        
+             fi
+
             cd /root/billing/attendify-billing
-        
-            
+
             git pull origin main
-        
-            
+
             if [ ! -f "docker-compose.yml" ]; then
               echo "Error: docker-compose.yml not found in repo"
               exit 1
-            fi
+             fi
 
-            echo 'Student1' | sudo -S docker compose -f docker-compose.yml up -d --build
-
+            docker compose -f docker-compose.yml up -d --build
             sleep 10
-            echo 'Student1' | sudo -S docker ps | grep fossbilling || (echo "Docker containers not running!" && exit 1)
-          EOF
+
+            docker ps | grep *** || (echo "Docker containers not running!" && exit 1)
+            INNER
+            EOF
 
       - name: Test Mode - Skip Deployment
         if: env.TEST_MODE == 'true'
