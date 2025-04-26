@@ -106,6 +106,14 @@ jobs:
               set -e
               cd /root/billing/attendify-billing
 
+              echo "==== Listing files in /root/billing/attendify-billing ===="
+              ls -la
+
+              if [ -f .dockerignore ]; then
+                echo "==== .dockerignore contents ===="
+                cat .dockerignore
+              fi
+
               if [ ! -d ".git" ]; then
                 git clone https://github.com/TomeIDK/attendify-billing.git .
               else
@@ -118,10 +126,11 @@ jobs:
                 exit 1
               fi
 
-              # Build images on the server
-              docker compose -f docker-compose.yml build
+              echo "==== Listing files before Docker build ===="
+              ls -la
 
-              # Start containers
+              docker compose -f docker-compose.yml build --no-cache
+
               docker compose -f docker-compose.yml up -d || { echo "Docker Compose up failed!"; docker compose logs --tail=100; exit 1; }
               sleep 10
 
