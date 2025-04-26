@@ -112,7 +112,7 @@ jobs:
               cd /root/billing/attendify-billing
 
               if [ ! -d ".git" ]; then
-                git clone <https://github.com/TomeIDK/attendify-billing.git> .
+                git clone https://github.com/TomeIDK/attendify-billing.git .
               else
                 git fetch --all
                 git reset --hard origin/main
