@@ -97,7 +97,7 @@ jobs:
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@*** << 'EOF'
+          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
 
             set -e
             echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing
