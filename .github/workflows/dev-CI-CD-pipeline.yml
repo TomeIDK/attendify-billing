@@ -69,11 +69,6 @@ jobs:
         run: |
           docker network create attendify_net || true
 
-      - name: Build Docker Images
-        run: |
-          docker build -f Dockerfile.consumer.dev -t fossbilling-consumer:latest .
-          docker build -f Dockerfile.producer.dev -t fossbilling-producer:latest .
-
       - name: Ensure Docker Network Exists
         run: |
           docker network create attendify_net || true
@@ -123,7 +118,11 @@ jobs:
                 exit 1
               fi
 
-              docker compose -f docker-compose.yml up -d --build || { echo "Docker Compose up failed!"; docker compose logs --tail=100; exit 1; }
+              # Build images on the server
+              docker compose -f docker-compose.yml build
+
+              # Start containers
+              docker compose -f docker-compose.yml up -d || { echo "Docker Compose up failed!"; docker compose logs --tail=100; exit 1; }
               sleep 10
 
               docker ps | grep billing-consumer || docker ps | grep billing-producer || { echo "Billing containers not running!"; docker compose logs --tail=100; exit 1; }
