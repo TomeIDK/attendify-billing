@@ -97,21 +97,29 @@ jobs:
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} "echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing"
-
-          scp -o StrictHostKeyChecking=no -P 20022 .env student@${{ secrets.DNS_NAME }}:/home/student/.env
-
-          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} "echo 'Student1' | sudo -S mv /home/student/.env /root/billing/attendify-billing/.env"
-
-          
-          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} "echo 'Student1' | sudo -S bash -c '
+          ssh -o StrictHostKeyChecking=no -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
             set -e
+            echo 'Student1' | sudo -S mkdir -p /root/billing/attendify-billing
+        
+              
+            sudo mv /home/student/.env /root/billing/attendify-billing/.env
+        
             cd /root/billing/attendify-billing
+        
+            
             git pull origin main
-            docker compose -f docker-compose.yml up -d --build
+        
+            
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "Error: docker-compose.yml not found in repo"
+              exit 1
+            fi
+
+            echo 'Student1' | sudo -S docker compose -f docker-compose.yml up -d --build
+
             sleep 10
-            docker ps | grep fossbilling
-          '"
+            echo 'Student1' | sudo -S docker ps | grep fossbilling || (echo "Docker containers not running!" && exit 1)
+          EOF
 
       - name: Test Mode - Skip Deployment
         if: env.TEST_MODE == 'true'
