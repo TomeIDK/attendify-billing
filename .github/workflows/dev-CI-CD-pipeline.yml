@@ -112,12 +112,11 @@ jobs:
               cd /root/billing/attendify-billing
 
               if [ ! -d ".git" ]; then
-                echo "No git repo found here. Exiting."
-                exit 1
+                git clone <https://github.com/TomeIDK/attendify-billing.git> .
+              else
+                git fetch --all
+                git reset --hard origin/main
               fi
-
-              git fetch --all
-              git reset --hard origin/main
 
               if [ ! -f "docker-compose.yml" ]; then
                 echo "Error: docker-compose.yml not found in repo"
