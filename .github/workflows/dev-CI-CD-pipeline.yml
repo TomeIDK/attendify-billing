@@ -97,9 +97,9 @@ jobs:
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} "mkdir -p /home/student/attendify-billing-dev/"
+          ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} "mkdir -p /home/student/attendify-billing/"
 
-          scp -o StrictHostKeyChecking=no -P 20022 .env student@${{ secrets.DNS_NAME }}:/home/student/attendify-billing-dev/
+          scp -o StrictHostKeyChecking=no -P 20022 .env student@${{ secrets.DNS_NAME }}:/home/student/attendify-billing/
 
           
           ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
