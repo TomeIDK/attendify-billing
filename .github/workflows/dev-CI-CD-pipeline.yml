@@ -117,7 +117,8 @@ jobs:
               exit 1
             fi
 
-            git pull --rebase --stat --verbose origin main || { echo "Git pull failed."; exit 1; }
+            git fetch --all
+            git reset --hard origin/main
 
             if [ ! -f "docker-compose.yml" ]; then
               echo "Error: docker-compose.yml not found in repo"
@@ -127,7 +128,7 @@ jobs:
             docker compose -f docker-compose.yml up -d --build
             sleep 10
 
-            docker ps | grep *** || (echo "Docker containers not running!" && exit 1)
+            docker ps | grep ${{ secrets.DNS_NAME }} || (echo "Docker containers not running!" && exit 1)
             '
             EOF
 
