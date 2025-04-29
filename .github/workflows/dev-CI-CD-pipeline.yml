@@ -40,46 +40,7 @@ jobs:
             exit 1
           fi
 
-      - name: Create Test Environment
-        if: env.TEST_MODE == 'true'
-        run: |
-          cat > .env << EOF
-          MYSQL_DB=fossbilling
-          MYSQL_USER=fossbilling
-          MYSQL_PASSWORD=test_password
-          MYSQL_ROOT_PASSWORD=test_root_password
-          RABBITMQ_USER=fossbilling
-          RABBITMQ_PASSWORD=test_rabbit_pass
-          EOF
-
-      - name: Setup Development Environment
-        if: ${{ !inputs.test_mode }}
-        run: |
-          echo > .env << EOF
-
-          
-          APP_ENV=development
-          APP_DEBUG=true
-          LOG_LEVEL=debug
-
-          FOSSBILLING_PORT=8081
-
-          MYSQL_HOST=mysql
-          MYSQL_DB=fossbilling
-          MYSQL_USER=fossbilling
-          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
-          MYSQL_PORT=3306
-          MYSQL_PORT_DOCKER=3306
-
-          RABBITMQ_HOST=rabbitmq
-          RABBITMQ_USER=attendify
-          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_DEFAULT_PASS }}
-          RABBITMQ_VHOST=attendify
-          RABBITMQ_PORT=5672
-          RABBITMQ_MANAGEMENT_PORT=15672
-
-          EOF
+     
 
 
       - name: Test Docker Compose Configuration
@@ -107,11 +68,7 @@ jobs:
             echo 'Student1' | sudo -S whoami
             echo 'Student1' | sudo -S ls -la /root
 
-            if [ -f /home/student/.env ]; then
-              echo 'Student1' | sudo -S mv /home/student/.env /root/billing/attendify-billing/.env
-            else
-              echo "Warning: /home/student/.env not found. Skipping move."
-            fi
+           
 
             echo 'Student1' | sudo -S bash -c '
               set -e
@@ -130,6 +87,35 @@ jobs:
                 exit 1
               fi
 
+              touch .env
+
+   
+              echo > .env << EOF
+
+              
+              APP_ENV=development
+              APP_DEBUG=true
+              LOG_LEVEL=debug
+
+              FOSSBILLING_PORT=8081
+
+              MYSQL_HOST=mysql
+              MYSQL_DB=fossbilling
+              MYSQL_USER=fossbilling
+              MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+              MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+              MYSQL_PORT=3306
+              MYSQL_PORT_DOCKER=3306
+
+              RABBITMQ_HOST=rabbitmq
+              RABBITMQ_USER=attendify
+              RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_DEFAULT_PASS }}
+              RABBITMQ_VHOST=attendify
+              RABBITMQ_PORT=5672
+              RABBITMQ_MANAGEMENT_PORT=15672
+
+              EOF
+              
               docker compose up --build -d || { 
               echo "Docker Compose up failed!"; 
               docker compose logs --tail=100;
@@ -140,6 +126,8 @@ jobs:
               docker ps | grep billing-consumer || docker ps | grep billing-producer || { echo "Billing containers not running!"; docker compose logs --tail=100; exit 1; }
             '
           EOF
+
+
 
       - name: Test Mode - Skip Deployment
         if: env.TEST_MODE == 'true'
