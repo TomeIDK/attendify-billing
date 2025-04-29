@@ -55,7 +55,7 @@ jobs:
       - name: Setup Development Environment
         if: ${{ !inputs.test_mode }}
         run: |
-          cat > .env << EOF
+          echo > .env << EOF
 
           
           APP_ENV=development
@@ -65,17 +65,17 @@ jobs:
           FOSSBILLING_PORT=8081
 
           MYSQL_HOST=mysql
-          MYSQL_DB=mysql
+          MYSQL_DB=fossbilling
           MYSQL_USER=fossbilling
           MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           MYSQL_PORT=3306
           MYSQL_PORT_DOCKER=3306
 
-                RABBITMQ_HOST=rabbitmq
-          RABBITMQ_USER=rabbitmq
+          RABBITMQ_HOST=rabbitmq
+          RABBITMQ_USER=attendify
           RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_DEFAULT_PASS }}
-          RABBITMQ_VHOST= 
+          RABBITMQ_VHOST=attendify
           RABBITMQ_PORT=5672
           RABBITMQ_MANAGEMENT_PORT=15672
 
