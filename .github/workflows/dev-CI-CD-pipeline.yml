@@ -56,12 +56,29 @@ jobs:
         if: ${{ !inputs.test_mode }}
         run: |
           cat > .env << EOF
-          MYSQL_DB=fossbilling
+
+          
+          APP_ENV=development
+          APP_DEBUG=true
+          LOG_LEVEL=debug
+
+          FOSSBILLING_PORT=8081
+
+          MYSQL_HOST=mysql
+          MYSQL_DB=mysql
           MYSQL_USER=fossbilling
           MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
-          RABBITMQ_USER=fossbilling
+          MYSQL_PORT=3306
+          MYSQL_PORT_DOCKER=3306
+
+          RABBITMQ_HOST=rabbitmq
+          RABBITMQ_USER=rabbitmq
           RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_DEFAULT_PASS }}
+          RABBITMQ_VHOST= 
+          RABBITMQ_PORT=5672
+          RABBITMQ_MANAGEMENT_PORT=15672
+
           EOF
 
 
