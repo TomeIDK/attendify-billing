@@ -64,14 +64,6 @@ jobs:
           RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_DEFAULT_PASS }}
           EOF
 
-      - name: Create Test Docker Network
-        if: env.TEST_MODE == 'true'
-        run: |
-          docker network create attendify_net || true
-
-      - name: Ensure Docker Network Exists
-        run: |
-          docker network create attendify_net || true
 
       - name: Test Docker Compose Configuration
         run: |
