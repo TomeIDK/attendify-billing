@@ -122,7 +122,7 @@ jobs:
 
               docker ps | grep billing-consumer || docker ps | grep billing-producer || { echo "Billing containers not running!"; docker compose logs --tail=100; exit 1; }
             '
-          EOF
+          'EOF'
 
 
 
