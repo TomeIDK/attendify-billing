@@ -10,11 +10,11 @@ on:
         default: false
   push:
     branches:
-      - release
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
-      - release
+      - main
     # Covers PRs from release → any other branch
 
 jobs:

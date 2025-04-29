@@ -10,11 +10,11 @@ on:
         default: false
   push:
     branches:
-      - main
+      - release
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
-      - main
+      - release
 
 jobs:
   deploy:
@@ -171,9 +171,6 @@ jobs:
           RABBITMQ_DEFAULT_PASS=test_rabbit_pass
           EOF
 
-      - name: Create Test Docker Network
-        run: |
-          docker network create attendify_net || true
 
       - name: Verify Required Files
         run: |
