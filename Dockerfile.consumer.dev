@@ -43,7 +43,7 @@ RUN ls /app
 RUN ls /app/consumers
 
 # install composer dependencies
-RUN composer install --no-interaction --no-cache --working-dir=/app/consumers --verbose
+RUN composer install --working-dir=/app/consumers
 
 # grant permissions
 # RUN chown -R www-data:www-data /app
