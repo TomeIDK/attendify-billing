@@ -84,7 +84,7 @@ jobs:
               touch .env
 
    
-              cat << EOF > .env
+              echo << EOT > .env
 
               
               APP_ENV=development
@@ -108,7 +108,7 @@ jobs:
               RABBITMQ_PORT=5672
               RABBITMQ_MANAGEMENT_PORT=15672
 
-              EOF
+              EOT
 
               docker compose -f docker-compose.yml --env-file .env config
               echo "Docker compose configuration is valid"
