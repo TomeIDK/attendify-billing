@@ -45,6 +45,9 @@ RUN ls /app/consumers
 # install composer dependencies
 RUN composer install --working-dir=/app/consumers
 
+RUN ls /app/consumers
+
+
 # grant permissions
 # RUN chown -R www-data:www-data /app
 
