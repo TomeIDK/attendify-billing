@@ -106,6 +106,8 @@ jobs:
               RABBITMQ_PORT=5672
               RABBITMQ_MANAGEMENT_PORT=15672
               " > .env
+              
+              curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
               cd consumers
               composer install
