@@ -56,6 +56,13 @@ while (true) {
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
             }
+            if (empty($row['sf_id'])) {                       
+                $row['sf_id'] = 'SF' . round(microtime(true) * 1000); 
+                $upd = $pdo->prepare(                         
+                    'UPDATE user_events SET sf_id = :sf WHERE id = :id' 
+                );
+                $upd->execute([':sf' => $row['sf_id'], ':id' => $row['id']]); 
+            }
             processRow($row, $row['operation'], $channel);
             markAsProcessed($row['id'], $pdo);
         }
@@ -66,7 +73,7 @@ while (true) {
 }
 
 // process user data 
-function processRow($userData, $operation, $channel) {
+function processRow($userData, $operation, $channel) {  
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
@@ -92,6 +99,7 @@ function formatUser($userData) {
             "operation" => strtolower($userData['operation']),
         ],
         "user" => [
+            "id"         => $userData['sf_id'],   
             "first_name" => $userData['first_name'],
             "last_name" => $userData['last_name'],
             "email" => $userData['email'],
