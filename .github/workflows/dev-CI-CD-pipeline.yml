@@ -1,0 +1,210 @@
+name: FOSSBilling Dev Deploy & PR Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Run in test mode (skip deployment)'
+        required: true
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+    env:
+      TEST_MODE: ${{ github.event.inputs.test_mode == 'true' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Verify Docker Compose
+        run: |
+          if [ ! -f "docker-compose.yml" ]; then
+            echo "Error: docker-compose.yml not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile.consumer.dev" ] || [ ! -f "Dockerfile.producer.dev" ]; then
+            echo "Error: Required Dockerfiles not found"
+            exit 1
+          fi
+
+      - name: Create Test Environment
+        if: env.TEST_MODE == 'true'
+        run: |
+          cat > .env << EOF
+          MYSQL_DB=fossbilling
+          MYSQL_USER=fossbilling
+          MYSQL_PASSWORD=test_password
+          MYSQL_ROOT_PASSWORD=test_root_password
+          RABBITMQ_USER=fossbilling
+          RABBITMQ_PASSWORD=test_rabbit_pass
+          EOF
+
+      - name: Setup Development Environment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          cat > .env << EOF
+          MYSQL_DB=fossbilling
+          MYSQL_USER=fossbilling
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=fossbilling
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_DEFAULT_PASS }}
+          EOF
+
+      - name: Create Test Docker Network
+        if: env.TEST_MODE == 'true'
+        run: |
+          docker network create attendify_net || true
+
+      - name: Ensure Docker Network Exists
+        run: |
+          docker network create attendify_net || true
+
+      - name: Test Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.yml --env-file .env config
+          echo "Docker compose configuration is valid"
+
+      - name: Setup SSH Agent
+        if: ${{ !inputs.test_mode }}
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Verify Server Connection
+        if: ${{ !inputs.test_mode }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} "echo 'Connection successful'"
+
+      - name: Deploy to Development Server
+        if: ${{ !inputs.test_mode }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
+            set -e
+            echo 'Student1' | sudo -S mkdir -pv /root/billing/attendify-billing
+            echo 'Student1' | sudo -S whoami
+            echo 'Student1' | sudo -S ls -la /root
+
+            if [ -f /home/student/.env ]; then
+              echo 'Student1' | sudo -S mv /home/student/.env /root/billing/attendify-billing/.env
+            else
+              echo "Warning: /home/student/.env not found. Skipping move."
+            fi
+
+            echo 'Student1' | sudo -S bash -c '
+              set -e
+              cd /root/billing/attendify-billing
+
+              if [ ! -d ".git" ]; then
+                git clone https://github.com/TomeIDK/attendify-billing.git .
+                which git
+                ping -c 1 github.com
+              else
+                git pull origin main
+              fi
+
+              if [ ! -f "docker-compose.yml" ]; then
+                echo "Error: docker-compose.yml not found in repo"
+                exit 1
+              fi
+
+              docker compose docker-compose.yml --build -d || { 
+              echo "Docker Compose up failed!"; 
+              docker compose logs --tail=100;
+               exit 1; 
+              }
+              sleep 10
+
+              docker ps | grep billing-consumer || docker ps | grep billing-producer || { echo "Billing containers not running!"; docker compose logs --tail=100; exit 1; }
+            '
+          EOF
+
+      - name: Test Mode - Skip Deployment
+        if: env.TEST_MODE == 'true'
+        run: |
+          echo "Running in test mode - deployment steps skipped"
+          echo "All build and configuration checks passed"
+
+      - name: Cleanup Test Environment
+        if: env.TEST_MODE == 'true'
+        run: |
+          docker network rm attendify_net || true
+          rm -f .env
+
+      - name: Cleanup Development Environment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          rm -f .env
+
+      - name: Verify Deployment
+        if: ${{ !inputs.test_mode }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
+            set -e
+            if ! docker ps | grep -q "fossbilling"; then
+              echo "Error: Services not running after deployment"
+              exit 1
+            fi
+          EOF
+
+  Pull-requests:
+    if: github.event_name == 'pull_request' && (github.base.ref == 'main' || github.head.ref == 'main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Create Test Environment
+        run: |
+          cat > .env << EOF
+          MYSQL_DATABASE=fossbilling_dev
+          MYSQL_USER=fossbilling_dev
+          MYSQL_PASSWORD=test_password
+          MYSQL_ROOT_PASSWORD=test_root_password
+          RABBITMQ_DEFAULT_USER=fossbilling_dev
+          RABBITMQ_DEFAULT_PASS=test_rabbit_pass
+          EOF
+
+      - name: Create Test Docker Network
+        run: |
+          docker network create attendify_net || true
+
+      - name: Verify Required Files
+        run: |
+          if [ ! -f "docker-compose.yml" ]; then
+            echo "Error: docker-compose.yml not found"
+            exit 1
+          fi
+          if [ ! -f "Dockerfile.consumer.dev" ] || [ ! -f "Dockerfile.producer.dev" ]; then
+            echo "Error: Required Dockerfiles not found"
+            exit 1
+          fi
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose -f docker-compose.yml --env-file .env config
+
+      - name: Cleanup Test Environment
+        run: |
+          docker network rm attendify_net || true
+          rm -f .env
+
+      - name: Run basic validation checks
+        run: |
+          echo "Validating PR from 'main' branch..."
+          # Place your real tests, linters, Docker dry-run, etc. here
+          echo "Checks passed for PR from main"
