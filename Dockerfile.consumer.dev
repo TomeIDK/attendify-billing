@@ -38,6 +38,10 @@ COPY consumers/ /app/consumers/
 # copy utility files
 COPY parser.php /app
 
+RUN ls /app
+
+RUN ls /app/consumers
+
 # install composer dependencies
 RUN composer install --no-interaction --no-cache --working-dir=/app/consumers --verbose
 
