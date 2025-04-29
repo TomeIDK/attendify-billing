@@ -29,6 +29,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no -p ${{ secrets.PROD_SSH_PORT }} ${{ secrets.PROD_SSH_USERNAME }}@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             set -e
             cd /home/ehbstudent/attendify/test-environment/testing-Billing
-            git pull origin main
+            git pull origin ci-cd
             docker compose up --build -d
           EOF
