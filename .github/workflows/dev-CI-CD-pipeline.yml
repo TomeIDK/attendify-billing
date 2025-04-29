@@ -107,7 +107,13 @@ jobs:
               RABBITMQ_MANAGEMENT_PORT=15672
               " > .env
 
-              
+              cd consumers
+              composer install
+
+              cd ../producers
+              composer install
+
+              cd ..
 
               docker compose -f docker-compose.yml --env-file .env config
               echo "Docker compose configuration is valid"
