@@ -1,17 +1,20 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;             
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Channel\AMQPChannel;
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/ProducerFunctions.php';
 
+#[Group('integration')]  
 class ProducerTest extends TestCase
 {
-    
     private AMQPChannel $channel;
-    private $connection;
+    private AMQPStreamConnection $connection;
+    private string $queueName;
 
     protected function setUp(): void
     {
@@ -24,38 +27,61 @@ class ProducerTest extends TestCase
         );
         $this->channel = $this->connection->channel();
 
-        // Setup a test queue bound to a test routing key
-        $this->channel->queue_declare('test_queue', false, false, false, true);
-        $this->channel->queue_bind('test_queue', 'user-management', 'user.register');
+        // make the queue unique & auto-delete when the channel closes
+        $this->queueName = 'test_queue_' . uniqid();
+        $this->channel->queue_declare($this->queueName, false, false, false, true);
+
+        // bind once per routing key we want to inspect
+        $this->channel->queue_bind($this->queueName, 'user-management', 'user.register');
+        $this->channel->queue_bind($this->queueName, 'user-management', 'user.update');
+        $this->channel->queue_bind($this->queueName, 'user-management', 'user.delete');
     }
 
-    public function testRealRabbitMqPublish()
+    #[DataProvider('operationProvider')]           // ← modern attribute
+    public function testRabbitMqPublish(string $operation, string $expectedRoutingKey): void
     {
         $userData = [
             'first_name' => 'Integration',
-            'last_name' => 'Test',
-            'email' => 'integration@test.com',
-            'title' => 'QA',
-            'password' => 'secure',
-            'operation' => 'CREATE'
+            'last_name'  => 'Test',
+            'email'      => 'integration@test.com',
+            'title'      => 'QA',
+            'password'   => 'secure',
+            'operation'  => $operation,
         ];
 
-        processRow($userData, 'CREATE', $this->channel);
+        // act
+        processRow($userData, $operation, $this->channel);
 
-        // Get the message back
-        $msg = $this->channel->basic_get('test_queue', true);
-        $this->assertNotNull($msg, "No message was published to the queue");
+        // give RabbitMQ a moment (helps on slower CI runners)
+        usleep(100_000);
 
+        // assert
+        $msg = $this->channel->basic_get($this->queueName, true);
+        $this->assertNotNull($msg, "No message was published for {$operation}");
+
+        // correct routing key?
+        $this->assertEquals($expectedRoutingKey, $msg->delivery_info['routing_key']);
+
+        // correct XML payload?
         $xml = simplexml_load_string($msg->body);
-        $this->assertEquals('Integration', (string)$xml->user->first_name);
-        $this->assertEquals('create', (string)$xml->info->operation);
+        $this->assertSame('Integration', (string) $xml->user->first_name);
+        $this->assertSame(strtolower($operation), (string) $xml->info->operation);
+    }
+
+    /** Data provider for the three operations */
+    public static function operationProvider(): array   // ← must be static
+    {
+        return [
+            ['CREATE', 'user.register'],
+            ['UPDATE', 'user.update'],
+            ['DELETE', 'user.delete'],
+        ];
     }
 
     protected function tearDown(): void
     {
-        $this->channel->queue_delete('test_queue');
+        $this->channel->queue_delete($this->queueName);
         $this->channel->close();
         $this->connection->close();
     }
 }
-
