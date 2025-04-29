@@ -56,7 +56,7 @@ jobs:
       - name: Deploy to Development Server
         if: ${{ !inputs.test_mode }}
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 -tt -p 20022 student@${{ secrets.DNS_NAME }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 -tt -p 20022 student@${{ secrets.DNS_NAME }} <<EOF
             set -e
             echo 'Student1' | sudo -S mkdir -pv /root/billing/attendify-billing
             echo 'Student1' | sudo -S whoami
@@ -84,9 +84,7 @@ jobs:
               touch .env
 
    
-              echo << EOT > .env
-
-              
+              echo "
               APP_ENV=development
               APP_DEBUG=true
               LOG_LEVEL=debug
@@ -107,8 +105,9 @@ jobs:
               RABBITMQ_VHOST=attendify
               RABBITMQ_PORT=5672
               RABBITMQ_MANAGEMENT_PORT=15672
+              " > .env
 
-              EOT
+              
 
               docker compose -f docker-compose.yml --env-file .env config
               echo "Docker compose configuration is valid"
