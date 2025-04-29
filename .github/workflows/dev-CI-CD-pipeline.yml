@@ -106,14 +106,6 @@ jobs:
               set -e
               cd /root/billing/attendify-billing
 
-              echo "==== Listing files in /root/billing/attendify-billing ===="
-              ls -la
-
-              if [ -f .dockerignore ]; then
-                echo "==== .dockerignore contents ===="
-                cat .dockerignore
-              fi
-
               if [ ! -d ".git" ]; then
                 git clone https://github.com/TomeIDK/attendify-billing.git .
               else
@@ -125,9 +117,6 @@ jobs:
                 echo "Error: docker-compose.yml not found in repo"
                 exit 1
               fi
-
-              echo "==== Listing files before Docker build ===="
-              ls -la
 
               docker compose -f docker-compose.yml build --no-cache
 
