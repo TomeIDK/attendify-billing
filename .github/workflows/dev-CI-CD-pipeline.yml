@@ -40,13 +40,7 @@ jobs:
             exit 1
           fi
 
-     
-
-
-      - name: Test Docker Compose Configuration
-        run: |
-          docker compose -f docker-compose.yml --env-file .env config
-          echo "Docker compose configuration is valid"
+          
 
       - name: Setup SSH Agent
         if: ${{ !inputs.test_mode }}
@@ -115,7 +109,10 @@ jobs:
               RABBITMQ_MANAGEMENT_PORT=15672
 
               EOF
-              
+
+              docker compose -f docker-compose.yml --env-file .env config
+              echo "Docker compose configuration is valid"
+
               docker compose up --build -d || { 
               echo "Docker Compose up failed!"; 
               docker compose logs --tail=100;
