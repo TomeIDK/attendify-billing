@@ -2,6 +2,8 @@
 # includes fossbilling, mysql, pub/sub
 # rabbitmq is not included here, must be available externally at RABBITMQ_HOST
 networks:
+  attendify_net:
+    external: true
   billing_net:
     driver: bridge
 
