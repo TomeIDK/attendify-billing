@@ -1,4 +1,4 @@
-# Passphrase test
+# Production CI/CD
 name: FOSSBilling Production Deployment
 
 on:
