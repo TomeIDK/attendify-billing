@@ -30,5 +30,6 @@ jobs:
             set -e
             cd /home/ehbstudent/attendify/attendify-billing
             git pull origin main
-            docker compose -f docker-compose.prod.yml up --build -d
+            cd /home/ehbstudent/attendify
+            docker compose up --build -d
           EOF
