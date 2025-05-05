@@ -29,14 +29,14 @@ WORKDIR /app
 # copy composer files
 COPY consumers/composer.json consumers/composer.lock ./consumers/
 
-# install composer dependencies
-RUN composer install --prefer-dist --no-progress --working-dir=/app/consumers
-
 # copy consumers code
 COPY consumers/ /app/consumers/
 
 # copy utility files
 COPY parser.php /app
+
+# install composer dependencies
+RUN composer install --working-dir=/app/consumers
 
 # grant permissions
 # RUN chown -R www-data:www-data /app

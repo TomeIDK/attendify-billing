@@ -6,7 +6,7 @@ networks:
 services:
   rabbitmq:
     image: rabbitmq:4-management
-    container_name: some-rabbit
+    # container_name: some-rabbit
     restart: always
     environment:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
