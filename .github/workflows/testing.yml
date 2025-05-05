@@ -1,5 +1,5 @@
 # Passphrase test
-name: FOSSBilling Production Deployment
+name: FOSSBilling Testing Deployment
 
 on:
   push:
