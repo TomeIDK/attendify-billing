@@ -38,6 +38,11 @@ COPY parser.php /app
 # install composer dependencies
 RUN composer install --no-dev --prefer-dist --no-progress --working-dir=/app/consumers
 
+RUN ls -a
+RUN ls -a /app
+RUN ls -a /app/consumers
+RUN ls -a /app/consumers/vendor
+
 # grant permissions
 # RUN chown -R www-data:www-data /app/consumers/vendor
 
