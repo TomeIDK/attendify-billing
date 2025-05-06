@@ -10,6 +10,7 @@ networks:
 services:
   fossbilling:
     image: fossbilling/fossbilling:latest
+    container_name: fossbilling-prod
     restart: always
     ports:
       - 30056:80
@@ -19,6 +20,7 @@ services:
       - billing_net
   mysql:
     image: mysql:8.2
+    container_name: billing-mysql-prod
     restart: always
     environment:
       MYSQL_DATABASE: fossbilling
@@ -37,6 +39,7 @@ services:
       - rabbitmq
       - fossbilling
       - mysql
+    container_name: billing-consumer-prod
     restart: always
     networks:
       - attendify_net
@@ -51,6 +54,7 @@ services:
       - rabbitmq
       - fossbilling
       - mysql
+    container_name: billing-producer-prod
     restart: always
     networks:
       - attendify_net
