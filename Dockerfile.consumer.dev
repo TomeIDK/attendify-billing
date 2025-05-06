@@ -42,4 +42,4 @@ COPY parser.php /app
 # RUN chown -R www-data:www-data /app
 
 # set entrypoint
-CMD ["sh","-c","for f in /app/consumers/*.php; do php \"$f\" & done; wait"]
+CMD ["php", "./consumers/start.php"]
