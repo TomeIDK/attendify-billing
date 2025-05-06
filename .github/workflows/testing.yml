@@ -1,10 +1,10 @@
-# Production CI/CD
-name: FOSSBilling Production Deployment
+# Passphrase test
+name: FOSSBilling Testing Deployment
 
 on:
   push:
     branches:
-      - main
+      - release
 
 jobs:
   deploy:
@@ -28,8 +28,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ secrets.PROD_SSH_PORT }} ${{ secrets.PROD_SSH_USERNAME }}@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             set -e
-            cd /home/ehbstudent/attendify/attendify-billing
-            git pull origin main
-            cd /home/ehbstudent/attendify
+            cd /home/ehbstudent/attendify/test-environment/testing-Billing/attendify-billing
+            git pull origin release
             docker compose up --build -d
           EOF
