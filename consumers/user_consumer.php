@@ -87,6 +87,12 @@ while ($channel->is_consuming()) {
     $channel->wait();
 }
 
+
+// generate id
+function generateNowId(): string {
+    return (new DateTimeImmutable('now', new DateTimeZone('UTC')))
+           ->format('Ymd\THis\Z');
+}
 /**
  * Bouwt één adresstring door street, number en bus_number te combineren.
  * => currently unnecessary -Cedric
@@ -111,9 +117,9 @@ function createUser(array $data, PDO $pdo) {
     $pdo->exec("SET @is_consumer_source = 1");
 
     $sql = "INSERT INTO client (
-                email, pass, first_name, last_name, custom_1, created_at, updated_at
+                email, pass, first_name, last_name, custom_1, custom_2, created_at, updated_at
             ) VALUES (
-                :email, :pass, :first_name, :last_name, :custom_1, :created_at, :updated_at
+                :email, :pass, :first_name, :last_name, :custom_1, :custom_2, :created_at, :updated_at
             )";
     $stmt = $pdo->prepare($sql);
     try {
@@ -123,6 +129,7 @@ function createUser(array $data, PDO $pdo) {
             ':first_name'     => $data['first_name'],
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
+            ':custom_2'       => $data['id'] ?? generateNowId(),
             ':created_at'     => $currentTime,
             ':updated_at'     => $currentTime,
         ]);
