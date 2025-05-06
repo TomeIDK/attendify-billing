@@ -17,8 +17,9 @@ pcntl_signal(SIGINT, function() use ($channel, $connection) {
     shutdownHandler($channel, $connection);
 });
 
+echo " [x] Consumer heartbeat started.\n";
+
 while (true) {
-    echo " [x] Consumer heartbeat started.\n";
     $xmlString = formatMessage();
     publishMessage($xmlString, $channel);
     echo " [✔] Heartbeat sent.\n";
