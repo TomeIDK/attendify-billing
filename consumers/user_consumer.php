@@ -1,28 +1,26 @@
 <?php
-/**
- * General Consumer for Attendify System
- * 
- * This consumer processes messages from multiple queues (billing.invoice and billing.user)
- * and performs the appropriate database operations based on the message content.
- */
-
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
-// Interval between polls (unused here, but kept for reference)
-define("INTERVAL", 5);
-declare(ticks = 1); // For graceful shutdown via pcntl_signal
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->safeload();
 
-// --- DATABASE CONNECTION via PDO ---
-$host    = getenv('MYSQL_HOST');
-$db      = getenv('MYSQL_DB');
-$user    = getenv('MYSQL_USER');
-$pass    = getenv('MYSQL_PASSWORD');
-$charset = 'utf8mb4';
-$port    = getenv('MYSQL_PORT');
+define("INTERVAL", 5); // interval between db polling
+declare(ticks = 1); // signal handling for pcntl_signal
+
+// --- DATABASE CONNECTIE via PDO ---
+$host       = $_ENV['MYSQL_HOST'];
+$db         = $_ENV['MYSQL_DB'];
+$user       = $_ENV['MYSQL_USER'];
+$pass       = $_ENV['MYSQL_PASSWORD'];
+$charset    = 'utf8mb4';
+$port       = $_ENV['MYSQL_PORT'];
+
+
+// create pdo instance
 $dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
 $pdoOptions = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -30,15 +28,9 @@ $pdoOptions = [
 ];
 $pdo = new PDO($dsn, $user, $pass, $pdoOptions);
 
-// --- RABBITMQ CONNECTION ---
-$connection = new AMQPStreamConnection(
-    getenv('RABBITMQ_HOST'),
-    getenv('RABBITMQ_PORT'),
-    getenv('RABBITMQ_USER'),
-    getenv('RABBITMQ_PASSWORD'),
-    getenv('RABBITMQ_VHOST')
-);
-$channel = $connection->channel();
+/// --- VERBINDING MET RABBITMQ ---
+$connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
+$channel    = $connection->channel();
 echo " [x] Connected to RabbitMQ.\n";
 
 // Graceful shutdown on CTRL+C
