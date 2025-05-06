@@ -104,7 +104,7 @@ function startHeartbeatService() {
             // Check each service
             foreach ($services as $service) {
                 $result = checkServiceStatus($service);
-                if ($result["status" == "up"])
+                if ($result["status"] == "up")
                 {
                     sendHeartbeat($channel, $service['name'], $result['status'], $result['error']);
                 }
