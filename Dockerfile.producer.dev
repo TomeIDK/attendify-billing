@@ -30,7 +30,7 @@ WORKDIR /app
 COPY producers/composer.json producers/composer.lock ./producers/
 
 # copy producers code
-COPY producers/ /app/producers/
+COPY producers/*.php /app/producers/
 
 # copy utility files
 COPY parser.php /app
@@ -39,7 +39,7 @@ COPY parser.php /app
 RUN composer install --prefer-dist --no-progress --working-dir=/app/producers
 
 # grant permissions
-# RUN chown -R www-data:www-data /app
+# RUN chown -R www-data:www-data /app/producers/vendor
 
 # set entrypoint
-CMD ["php", "./producers/user_producer.php"]
+CMD ["php", "./producers/start.php"]

@@ -54,9 +54,6 @@ services:
       - mysql
     container_name: billing-consumer-testing
     restart: always
-    volumes:
-      - ./consumers:/app/consumers
-      - ./parser.php:/app/parser.php
     networks:
       - billing_net_testing
     env_file:
@@ -71,9 +68,6 @@ services:
       - mysql
     container_name: billing-producer-testing
     restart: always
-    volumes:
-      - ./producers:/app/producers
-      - ./parser.php:/app/parser.php
     networks:
       - billing_net_testing
     env_file:
