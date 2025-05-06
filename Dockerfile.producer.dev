@@ -38,13 +38,8 @@ COPY parser.php /app
 # install composer dependencies
 RUN composer install --prefer-dist --no-progress --working-dir=/app/producers
 
-RUN ls -a
-RUN ls -a /app
-RUN ls -a /app/producers
-RUN ls -a /app/producers/vendor
-
 # grant permissions
 # RUN chown -R www-data:www-data /app/producers/vendor
 
 # set entrypoint
-CMD ["php", "./producers/user_producer.php"]
+CMD ["php", "./producers/start.php"]
