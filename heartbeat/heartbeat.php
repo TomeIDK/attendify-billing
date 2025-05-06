@@ -63,7 +63,7 @@ function sendHeartbeat($channel, $service, $status, $error) {
     // format user data to compatible format for rabbitmq
     $timestamp = round(microtime(true) * 1000);
     $formattedHeartbeat = [
-            "sender" => "billing-{$service["name"]}",
+            "sender" => "billing-$service",
             "timestamp" => $timestamp,
     ];
 
