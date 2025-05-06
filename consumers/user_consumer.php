@@ -28,7 +28,7 @@ $pdoOptions = [
 ];
 $pdo = new PDO($dsn, $user, $pass, $pdoOptions);
 
-/// --- VERBINDING MET RABBITMQ ---
+// --- VERBINDING MET RABBITMQ ---
 $connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
 $channel    = $connection->channel();
 echo " [x] Connected to RabbitMQ.\n";
