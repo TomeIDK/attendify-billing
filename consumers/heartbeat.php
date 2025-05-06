@@ -28,18 +28,14 @@ while (true) {
 
 
 function formatMessage() {
-    $timestamp = (new DateTime())->format(DATE_ATOM);
+    $timestamp = round(microtime(true) * 1000);
     $array = [
-        "info" =>
-        [
             "sender" => "billing",
-            "container_name" => "attendify-billing-consumer-1",
             "timestamp" => $timestamp
-        ],
     ];
 
     // convert formatted user to xml
-    $xml = new SimpleXMLElement("<attendify/>");
+    $xml = new SimpleXMLElement("<heartbeat/>");
     arrayToXml($array, $xml);
 
     // format xml
