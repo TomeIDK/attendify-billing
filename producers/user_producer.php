@@ -56,12 +56,24 @@ while (true) {
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
             }
-            if (empty($row['sf_id'])) {                       
-                $row['sf_id'] = 'SF' . round(microtime(true) * 1000); 
+            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {                       
+                $row['uid'] = 'FB' . round(microtime(true) * 1000); 
+
+                 //Update user_events
                 $upd = $pdo->prepare(                         
-                    'UPDATE user_events SET sf_id = :sf WHERE id = :id' 
+                    'UPDATE user_events SET uid = :uid WHERE id = :id'
+
                 );
-                $upd->execute([':sf' => $row['sf_id'], ':id' => $row['id']]); 
+                $upd->execute([':uid' => $row['uid'], ':id' => $row['id']]); 
+
+                //Update client.custom_2 to match
+                $clientUpdate = $pdo->prepare(
+                    'UPDATE client SET custom_2 = :uid WHERE id = :id'
+                );
+                $clientUpdate->execute([
+                    ':uid' => $row['uid'],
+                    ':id' => $row['id']
+                ]);
             }
             processRow($row, $row['operation'], $channel);
             markAsProcessed($row['id'], $pdo);
@@ -99,11 +111,12 @@ function formatUser($userData) {
             "operation" => strtolower($userData['operation']),
         ],
         "user" => [
-            "id"         => $userData['sf_id'],   
+            "id"         => $userData['id'],   
             "first_name" => $userData['first_name'],
             "last_name" => $userData['last_name'],
             "email" => $userData['email'],
             "title" => $userData['title'],
+            "uid" => $userData['uid'],
             "password" => $userData['password']
         ]
     ];

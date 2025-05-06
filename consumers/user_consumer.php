@@ -87,12 +87,6 @@ while ($channel->is_consuming()) {
     $channel->wait();
 }
 
-
-// generate id
-function generateNowId(): string {
-    return (new DateTimeImmutable('now', new DateTimeZone('UTC')))
-           ->format('Ymd\THis\Z');
-}
 /**
  * Bouwt één adresstring door street, number en bus_number te combineren.
  * => currently unnecessary -Cedric
@@ -129,7 +123,7 @@ function createUser(array $data, PDO $pdo) {
             ':first_name'     => $data['first_name'],
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
-            ':custom_2'       => $data['id'] ?? generateNowId(),
+            ':custom_2'       => $data['uid'],
             ':created_at'     => $currentTime,
             ':updated_at'     => $currentTime,
         ]);
@@ -158,7 +152,7 @@ function updateUser(array $data, PDO $pdo) {
                 last_name = :last_name,
                 custom_1 = :custom_1,
                 updated_at = :updated_at
-            WHERE email = :email";
+            WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
@@ -167,12 +161,13 @@ function updateUser(array $data, PDO $pdo) {
             ':first_name'     => $data['first_name'],
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
+            ':custom_2'       => $data['uid'],
             ':updated_at'     => $currentTime,
         ]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User updated with email: {$data['email']}\n";
+            echo " [✔] User updated with UID: {$data['uid']}\n";
         } else {
-            echo " [!] Geen gebruiker bijgewerkt met email: {$data['email']}. Controleer of deze bestaat.\n";
+            echo " [!] Geen gebruiker bijgewerkt met UID: {$data['uid']}. Controleer of deze bestaat.\n";
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
@@ -183,14 +178,14 @@ function updateUser(array $data, PDO $pdo) {
  * Verwijdert een gebruiker uit de fossbilling database op basis van het emailadres.
  */
 function deleteUser(array $data, PDO $pdo) {
-    $sql = "DELETE FROM client WHERE email = :email";
+    $sql = "DELETE FROM client WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
-        $stmt->execute([':email' => $data['email']]);
+        $stmt->execute([':custom_2' => $data['uid']]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User successfully deleted with email: {$data['email']}\n";
+            echo " [✔] User successfully deleted with UID: {$data['uid']}\n";
         } else {
-            echo " [!] No user found with email: {$data['email']}.\n";
+            echo " [!] No user found with UID: {$data['uid']}.\n";
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
