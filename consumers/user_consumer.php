@@ -1,6 +1,6 @@
 <?php
 
-require_once '/app/vendor/autoload.php';
+require_once('/app/consumers/vendor/autoload.php');
 require __DIR__ . '/../parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
