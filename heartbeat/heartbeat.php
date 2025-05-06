@@ -84,7 +84,6 @@ function sendHeartbeat($channel, $service, $status, $error) {
 
     // Publish to monitoring exchange with routing key
     $channel->basic_publish($message, 'monitoring', 'monitoring.heartbeat');
-    echo " [✔] Heartbeat sent for '$service'";
 }
 
 
@@ -107,6 +106,8 @@ function startHeartbeatService() {
                 if ($result["status"] == "up")
                 {
                     sendHeartbeat($channel, $service['name'], $result['status'], $result['error']);
+                    echo " [✔] Heartbeat sent for '{$service["name"]}'";
+
                 }
             }
             sleep(1);
