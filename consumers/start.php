@@ -1,7 +1,4 @@
 <?php
-echo "Current working directory: " . getcwd() . "\n";
-echo "Files in directory:\n";
-print_r(scandir(getcwd()));
 
 // > /dev/null 2>&1 & 
 // ensure processes run in the background (Linux)

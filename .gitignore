@@ -7,6 +7,8 @@
 composer.phar
 volumes
 
+/consumers/logs
+
 # Composer lock files (optional, but recommended to commit for applications)
 # /composer.lock
 # /consumers/composer.lock
