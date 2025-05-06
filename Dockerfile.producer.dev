@@ -29,17 +29,17 @@ WORKDIR /app
 # copy composer files
 COPY producers/composer.json producers/composer.lock ./producers/
 
-# install composer dependencies
-RUN composer install --prefer-dist --no-progress --working-dir=/app/producers
-
 # copy producers code
 COPY producers/*.php /app/producers/
 
 # copy utility files
 COPY parser.php /app
 
+# install composer dependencies
+RUN composer install --prefer-dist --no-progress --working-dir=/app/producers
+
 # grant permissions
-RUN chown -R www-data:www-data /app/producers/vendor
+# RUN chown -R www-data:www-data /app/producers/vendor
 
 # set entrypoint
 CMD ["php", "./producers/user_producer.php"]
