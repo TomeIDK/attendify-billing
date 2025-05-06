@@ -38,11 +38,8 @@ COPY consumers/*.php /app/consumers/
 # copy utility files
 COPY parser.php /app
 
-RUN ls /app/consumers/vendor
-
-
 # grant permissions
-# RUN chown -R www-data:www-data /app
+RUN chown -R www-data:www-data /app/consumers/vendor
 
 # set entrypoint
 CMD ["php", "./consumers/user_consumer.php"]

@@ -38,10 +38,8 @@ COPY producers/*.php /app/producers/
 # copy utility files
 COPY parser.php /app
 
-RUN ls /app/producers/vendor
-
 # grant permissions
-# RUN chown -R www-data:www-data /app
+RUN chown -R www-data:www-data /app/producers/vendor
 
 # set entrypoint
 CMD ["php", "./producers/user_producer.php"]
