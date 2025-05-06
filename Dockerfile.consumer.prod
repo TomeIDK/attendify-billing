@@ -42,4 +42,4 @@ RUN composer install --no-dev --prefer-dist --no-progress --working-dir=/app/con
 # RUN chown -R www-data:www-data /app
 
 # set entrypoint
-CMD ["php", "./consumers/user_consumer.php"]
+CMD ["php", "./consumers/start.php"]
