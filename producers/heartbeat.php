@@ -30,7 +30,7 @@ while (true) {
 function formatMessage() {
     $timestamp = round(microtime(true) * 1000);
     $array = [
-            "sender" => "billing",
+            "sender" => "billing-producer",
             "timestamp" => $timestamp
     ];
 
