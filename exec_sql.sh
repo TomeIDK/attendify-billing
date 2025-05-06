@@ -29,7 +29,7 @@ sudo cp $SCRIPTS_DIR/*.sql $VOLUME_DIR/
 for file in "${REQUIRED_FILES[@]}"; do
   echo "Executing $file inside container..."
   sudo docker exec -i "$CONTAINER_NAME" sh -c \
-    "mysql -u root -p\"$MYSQL_ROOT_PASSWORD\" < /var/lib/mysql/scripts/$file"
+    "mysql -u root -p\"$MYSQL_ROOT_PASSWORD\" fossbilling < /var/lib/mysql/scripts/$file"
 done
 
 echo "SQL scripts executed successfully."
