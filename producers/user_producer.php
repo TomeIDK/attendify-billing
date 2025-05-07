@@ -28,6 +28,8 @@ $options = [
 ];
 $pdo = new PDO($dsn, $user, $pass, $options);
 
+$pdo->exec("SET @is_consumer_source = 1");
+
 // rabbitmq credentials
 $connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASSWORD'), getenv('RABBITMQ_VHOST'));
 $channel = $connection->channel();
@@ -68,11 +70,11 @@ while (true) {
 
                 //Update client.custom_2 to match
                 $clientUpdate = $pdo->prepare(
-                    'UPDATE client SET custom_2 = :uid WHERE id = :id'
+                    'UPDATE client SET custom_2 = :uid WHERE email = :email'
                 );
                 $clientUpdate->execute([
                     ':uid' => $row['uid'],
-                    ':id' => $row['id']
+                    ':email' => $row['email']
                 ]);
             }
             processRow($row, $row['operation'], $channel);
