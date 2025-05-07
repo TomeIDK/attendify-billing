@@ -133,20 +133,21 @@ function createUser(array $data, PDO $pdo) {
     $pdo->exec("SET @is_consumer_source = 1");
 
     $sql = "INSERT INTO client (
-                email, pass, first_name, last_name, custom_1, created_at, updated_at
+                email, pass, first_name, last_name, custom_1, custom_2, created_at, updated_at
             ) VALUES (
-                :email, :pass, :first_name, :last_name, :custom_1, :created_at, :updated_at
+                :email, :pass, :first_name, :last_name, :custom_1, :custom_2, :created_at, :updated_at
             )";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
-            ':email'      => $data['email'],
-            ':pass'       => $data['password'],
-            ':first_name' => $data['first_name'],
-            ':last_name'  => $data['last_name'],
-            ':custom_1'      => trim($data['title']),
-            ':created_at' => $currentTime,
-            ':updated_at' => $currentTime,
+            ':email'          => $data['email'],
+            ':pass'           => $data['password'],
+            ':first_name'     => $data['first_name'],
+            ':last_name'      => $data['last_name'],
+            ':custom_1'       => trim($data['title']),
+            ':custom_2'       => $data['uid'],
+            ':created_at'     => $currentTime,
+            ':updated_at'     => $currentTime,
         ]);
         echo " [✔] User created successfully: {$data['email']}\n";
     } catch (PDOException $e) {
@@ -170,21 +171,23 @@ function updateUser(array $data, PDO $pdo) {
                 last_name = :last_name,
                 custom_1 = :custom_1,
                 updated_at = :updated_at
-            WHERE email = :email";
+            WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
-            ':email'      => $data['email'],
-            ':pass'       => $data['password'],
-            ':first_name' => $data['first_name'],
-            ':last_name'  => $data['last_name'],
-            ':custom_1'      => trim($data['title']),
-            ':updated_at' => $currentTime,
+            ':email'          => $data['email'],
+            ':pass'           => $data['password'],
+            ':first_name'     => $data['first_name'],
+            ':last_name'      => $data['last_name'],
+            ':custom_1'       => trim($data['title']),
+            ':custom_2'       => $data['uid'],
+            ':updated_at'     => $currentTime,
         ]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User updated with email: {$data['email']}\n";
+            echo " [✔] User updated with UID: {$data['uid']}\n";
         } else {
-            echo " [!] No user found to update with email: {$data['email']}. Check if it exists.\n";
+            echo " [!] No user found to update with UID: {$data['uid']}. Check if it exists.\n";
+          
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
@@ -195,14 +198,14 @@ function updateUser(array $data, PDO $pdo) {
  * Delete a user from the users table.
  */
 function deleteUser(array $data, PDO $pdo) {
-    $sql = "DELETE FROM client WHERE email = :email";
+    $sql = "DELETE FROM client WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
-        $stmt->execute([':email' => $data['email']]);
+        $stmt->execute([':custom_2' => $data['uid']]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User successfully deleted with email: {$data['email']}\n";
+            echo " [✔] User successfully deleted with UID: {$data['uid']}\n";
         } else {
-            echo " [!] No user found with email: {$data['email']}.\n";
+            echo " [!] No user found with UID: {$data['uid']}.\n";
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
