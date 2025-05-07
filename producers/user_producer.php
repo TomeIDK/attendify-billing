@@ -61,14 +61,7 @@ while (true) {
             if ($row['operation'] === 'CREATE' && empty($row['uid'])) {                       
                 $row['uid'] = 'FB' . round(microtime(true) * 1000); 
 
-                 //Update user_events
-                $upd = $pdo->prepare(                         
-                    'UPDATE user_events SET uid = :uid WHERE id = :id'
-
-                );
-                $upd->execute([':uid' => $row['uid'], ':id' => $row['id']]); 
-
-                //Update client.custom_2 to match
+                //Update client.custom_2
                 $clientUpdate = $pdo->prepare(
                     'UPDATE client SET custom_2 = :uid WHERE email = :email'
                 );
