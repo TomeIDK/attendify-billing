@@ -2,12 +2,15 @@
 # includes fossbilling, mysql, pub/sub
 # rabbitmq is not included here, must be available externally at RABBITMQ_HOST
 networks:
+  attendify_net:
+    external: true
   billing_net:
     driver: bridge
 
 services:
   fossbilling:
     image: fossbilling/fossbilling:latest
+    container_name: fossbilling-prod
     restart: always
     ports:
       - 30056:80
@@ -17,6 +20,7 @@ services:
       - billing_net
   mysql:
     image: mysql:8.2
+    container_name: billing-mysql-prod
     restart: always
     environment:
       MYSQL_DATABASE: fossbilling
@@ -35,6 +39,7 @@ services:
       - rabbitmq
       - fossbilling
       - mysql
+    container_name: billing-consumer-prod
     restart: always
     networks:
       - attendify_net
@@ -49,6 +54,22 @@ services:
       - rabbitmq
       - fossbilling
       - mysql
+    container_name: billing-producer-prod
+    restart: always
+    networks:
+      - attendify_net
+      - billing_net
+    env_file:
+      - .env
+  billing-heartbeat:
+    build:
+      context: .
+      dockerfile: Dockerfile.heartbeat.prod
+    depends_on:
+      - rabbitmq
+      - fossbilling
+      - mysql
+    container_name: billing-heartbeat-prod
     restart: always
     networks:
       - attendify_net

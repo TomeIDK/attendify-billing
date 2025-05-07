@@ -1,12 +1,12 @@
 # dev compose file
 # includes rabbitmq, fossbilling, mysql, pub/sub
 networks:
-  billing_net:
+  billing_net_testing:
     driver: bridge
 services:
   rabbitmq:
     image: rabbitmq:4-management
-    container_name: some-rabbit
+    container_name: billing-rabbitmq-testing
     restart: always
     environment:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
@@ -18,18 +18,20 @@ services:
     volumes:
       - ./volumes/rabbitmq:/var/lib/rabbitmq
     networks:
-      - billing_net
+      - billing_net_testing
   fossbilling:
     image: fossbilling/fossbilling:latest
+    container_name: fossbilling-testing
     restart: always
     ports:
       - "${FOSSBILLING_PORT}:80"
     volumes:
       - fossbilling:/var/www/html
     networks:
-      - billing_net
+      - billing_net_testing
   mysql:
     image: mysql:8.2
+    container_name: billing-mysql-testing
     restart: always
     ports:
       - "${MYSQL_PORT_DOCKER}:3306"
@@ -41,7 +43,7 @@ services:
     volumes:
       - ./volumes/mysql:/var/lib/mysql
     networks:
-      - billing_net
+      - billing_net_testing
   billing-consumer:
     build:
       context: .
@@ -50,12 +52,10 @@ services:
       - rabbitmq
       - fossbilling
       - mysql
+    container_name: billing-consumer-testing
     restart: always
-    volumes:
-      - ./consumers:/app/consumers
-      - ./parser.php:/app/parser.php
     networks:
-      - billing_net
+      - billing_net_testing
     env_file:
       - .env
   billing-producer:
@@ -66,12 +66,24 @@ services:
       - rabbitmq
       - fossbilling
       - mysql
+    container_name: billing-producer-testing
     restart: always
-    volumes:
-      - ./producers:/app/producers
-      - ./parser.php:/app/parser.php
     networks:
-      - billing_net
+      - billing_net_testing
+    env_file:
+      - .env
+  billing-heartbeat:
+    build:
+      context: .
+      dockerfile: Dockerfile.heartbeat.dev
+    depends_on:
+      - rabbitmq
+      - fossbilling
+      - mysql
+    container_name: billing-heartbeat-testing
+    restart: always
+    networks:
+      - billing_net_testing
     env_file:
       - .env
       

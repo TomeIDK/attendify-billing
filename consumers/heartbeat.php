@@ -1,11 +1,69 @@
 <?php
+require_once __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/../parser.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    http_response_code(405);
-    echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
-    exit;
+use PhpAmqpLib\Connection\AMQPStreamConnection;
+use PhpAmqpLib\Message\AMQPMessage;
+
+declare(ticks = 1); // signal handling for pcntl_signal
+
+// rabbitmq credentials
+$connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASSWORD'), getenv('RABBITMQ_VHOST'));
+$channel = $connection->channel();
+echo " [x] Connected to RabbitMQ.\n";
+
+// close connection if shutdown command is given (CTRL+C)
+pcntl_signal(SIGINT, function() use ($channel, $connection) {
+    shutdownHandler($channel, $connection);
+});
+
+echo " [x] Consumer heartbeat started.\n";
+
+while (true) {
+    $xmlString = formatMessage();
+    publishMessage($xmlString, $channel);
+    echo " [✔] Heartbeat sent.\n";
+    sleep(1);
 }
 
-header('Content-Type: application/json');
 
-echo json_encode(["status" => "success", "message" => "Attendify billing consumer is up"]);
+function formatMessage() {
+    $timestamp = round(microtime(true) * 1000);
+    $array = [
+            "sender" => "billing-consumer",
+            "timestamp" => $timestamp
+    ];
+
+    // convert formatted user to xml
+    $xml = new SimpleXMLElement("<heartbeat/>");
+    arrayToXml($array, $xml);
+
+    // format xml
+    $dom = new DOMDocument("1.0");
+    $dom->preserveWhiteSpace = false;
+    $dom->formatOutput = true;
+    $dom->loadXML($xml->asXML());
+
+    return $dom->saveXML();
+}
+
+
+
+// publish the xml message to rabbitmq
+function publishMessage($xmlString, $channel) {
+    $msg = new AMQPMessage(
+        $xmlString,
+        ['content-type' => 'application/xml']
+    );
+    $channel->basic_publish($msg, 'monitoring', 'monitoring.heartbeat');
+}
+
+// shutdown command handler
+function shutdownHandler($channel, $connection) {
+    echo " [x] Closing RabbitMQ connection...\n";
+    $channel->close();
+    $connection->close();
+    echo " [x] Consumer heartbeat stopped.\n";
+
+    exit(0);
+};
