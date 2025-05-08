@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage check
+# usage check
 if [ -z "$2" ]; then
   echo "Usage: $0 <mysql_container_id> <create_script_name.sql>"
   exit 1
@@ -13,6 +13,7 @@ echo ""
 SCRIPTS_DIR="./scripts"
 VOLUME_DIR="./volumes/mysql/scripts"
 REQUIRED_FILES=("${2/create/drop}" $2)
+echo "${2/create/drop}"
 CONTAINER_NAME="$1"
 
 # verify files exist
@@ -21,6 +22,12 @@ for file in "${REQUIRED_FILES[@]}"; do
     echo "Error: File $SCRIPTS_DIR/$file does not exist."
     exit 1
   fi
+done
+
+# copy only the required scripts
+echo "Copying SQL scripts to $VOLUME_DIR..."
+for file in "${REQUIRED_FILES[@]}"; do
+  sudo cp "$SCRIPTS_DIR/$file" "$VOLUME_DIR/"
 done
 
 # execute into the mysql container and run the scripts

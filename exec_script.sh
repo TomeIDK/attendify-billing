@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage check
+# usage check
 if [ -z "$2" ]; then
   echo "Usage: $0 <mysql_container_id> <create_script_name.sql>"
   exit 1

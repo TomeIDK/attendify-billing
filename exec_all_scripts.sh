@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage check
+# usage check
 if [ -z "$1" ]; then
   echo "Usage: $0 <mysql_container_id>"
   exit 1
