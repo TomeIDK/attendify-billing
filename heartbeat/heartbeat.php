@@ -1,22 +1,25 @@
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
-require 'parser.php';
+require __DIR__ . '/../parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->safeload();
 
 // services to monitor - updated to match docker-compose services
 $services = [
     [
         'name' => 'fossbilling',
-        'host' => 'attendify-billing-fossbilling-1',  // default docker-compose name
+        'host' => 'fossbilling',
         'port' => 80,
         'type' => 'http'
     ],
     [
         'name' => 'mysql',
-        'host' => 'attendify-billing-mysql-1',  // default docker-compose name
+        'host' => 'mysql',
         'port' => 3306,
         'type' => 'tcp'
     ]
@@ -57,22 +60,15 @@ function checkServiceStatus($service) {
 }
 
 function sendHeartbeat($channel, $service, $status, $error) {
-    if ($status == 'down') {
-        echo " [x] Service '$service' is down: $error\n";
-        return;
-    }
-
-// format user data to compatible format for rabbitmq
+    // format user data to compatible format for rabbitmq
+    $timestamp = round(microtime(true) * 1000);
     $formattedHeartbeat = [
-        "info" => [
-            "sender" => 'billing',
-            "container_name" => $service,
-            "timestamp" => time(),
-        ]
+            "sender" => "billing-$service",
+            "timestamp" => $timestamp,
     ];
 
     // convert formatted user to xml
-    $xml = new SimpleXMLElement("<attendify/>");
+    $xml = new SimpleXMLElement("<heartbeat/>");
     arrayToXml($formattedHeartbeat, $xml);
 
     // format xml
@@ -88,7 +84,6 @@ function sendHeartbeat($channel, $service, $status, $error) {
 
     // Publish to monitoring exchange with routing key
     $channel->basic_publish($message, 'monitoring', 'monitoring.heartbeat');
-    echo " [✔] Heartbeat sent for '$service' at " . date('Y-m-d H:i:s') . ". Status: $status\n";
 }
 
 
@@ -96,16 +91,9 @@ function startHeartbeatService() {
     global $services;
     
     // Connect to RabbitMQ using Docker service name
-    $connection = new AMQPStreamConnection(
-        'rabbitmq',  // matches container_name in docker-compose
-        5672,           // port
-        'attendify',    // username from docker-compose
-        getenv('RABBITMQ_PASSWORD') ?: 'uXe5u1oWkh32JyLA', // password from env
-        'attendify'     // vhost from docker-compose
-    );
-    $channel = $connection->channel();
+    $connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
 
-    $channel->exchange_declare('monitoring', 'topic', false, true, false);
+    $channel = $connection->channel();
 
     echo " [x] Heartbeat service started!\n";
 
@@ -115,7 +103,12 @@ function startHeartbeatService() {
             // Check each service
             foreach ($services as $service) {
                 $result = checkServiceStatus($service);
-                sendHeartbeat($channel, $service['name'], $result['status'], $result['error']);
+                if ($result["status"] == "up")
+                {
+                    sendHeartbeat($channel, $service['name'], $result['status'], $result['error']);
+                    echo " [✔] Heartbeat sent for '{$service["name"]}'";
+
+                }
             }
             sleep(1);
         } catch (\Exception $e) {
@@ -125,15 +118,9 @@ function startHeartbeatService() {
             // Try to reconnect if connection was lost
             try {
                 if (!$connection->isConnected()) {
-                    $connection = new AMQPStreamConnection(
-                        'some-rabbit',
-                        5672,
-                        'attendify',
-                        getenv('RABBITMQ_PASSWORD') ?: 'guest',
-                        'attendify'
-                    );
+                    $connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
+
                     $channel = $connection->channel();
-                    $channel->exchange_declare('monitoring', 'topic', false, true, false);
                 }
             } catch (\Exception $reconnectException) {
                 echo " [!] Failed to reconnect: " . $reconnectException->getMessage() . "\n";
@@ -146,18 +133,18 @@ function startHeartbeatService() {
     $connection->close();
 }
 
-// Simple test mode - just check services without RabbitMQ
-if (isset($argv[1]) && $argv[1] === 'test') {
-    echo "Testing service status...\n";
-    foreach ($services as $service) {
-        $result = checkServiceStatus($service);
-        echo "Service: {$service['name']}\n";
-        echo "Status: {$result['status']}\n";
-        if ($result['error']) {
-            echo "Error: {$result['error']}\n";
-        }
-        echo "-------------------\n";
-    }
-} else {
+// // Simple test mode - just check services without RabbitMQ
+// if (isset($argv[1]) && $argv[1] === 'test') {
+//     echo "Testing service status...\n";
+//     foreach ($services as $service) {
+//         $result = checkServiceStatus($service);
+//         echo "Service: {$service['name']}\n";
+//         echo "Status: {$result['status']}\n";
+//         if ($result['error']) {
+//             echo "Error: {$result['error']}\n";
+//         }
+//         echo "-------------------\n";
+//     }
+// } else {
     startHeartbeatService();
-}
+// }

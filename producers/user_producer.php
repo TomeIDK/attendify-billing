@@ -27,6 +27,8 @@ $options = [
 ];
 $pdo = new PDO($dsn, $user, $pass, $options);
 
+$pdo->exec("SET @is_consumer_source = 1");
+
 // rabbitmq credentials
 $connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASSWORD'), getenv('RABBITMQ_VHOST'));
 $channel = $connection->channel();
@@ -55,6 +57,19 @@ while (true) {
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
             }
+            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {    
+                echo " [*] Generating UID...";
+                $row['uid'] = 'FB' . round(microtime(true) * 1000); 
+                echo " [x] UID '{$row['uid']}' generated.";
+                //Update client.custom_2
+                $clientUpdate = $pdo->prepare(
+                    'UPDATE client SET custom_2 = :uid WHERE id = :id'
+                );
+                $clientUpdate->execute([
+                    ':uid' => $row['uid'],
+                    ':id' => $row['id']
+                ]);
+            }
             processRow($row, $row['operation'], $channel);
             markAsProcessed($row['id'], $pdo);
         }
@@ -65,7 +80,7 @@ while (true) {
 }
 
 // process user data 
-function processRow($userData, $operation, $channel) {
+function processRow($userData, $operation, $channel) {  
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
@@ -91,10 +106,12 @@ function formatUser($userData) {
             "operation" => strtolower($userData['operation']),
         ],
         "user" => [
+            "id"         => $userData['id'],   
             "first_name" => $userData['first_name'],
             "last_name" => $userData['last_name'],
             "email" => $userData['email'],
             "title" => $userData['title'],
+            "uid" => $userData['uid'],
             "password" => $userData['password']
         ]
     ];

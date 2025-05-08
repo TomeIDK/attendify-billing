@@ -1,4 +1,4 @@
-# Passphrase test
+# Testing CI/CD
 name: FOSSBilling Testing Deployment
 
 on:

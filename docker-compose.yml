@@ -72,6 +72,20 @@ services:
       - billing_net_testing
     env_file:
       - .env
+  billing-heartbeat:
+    build:
+      context: .
+      dockerfile: Dockerfile.heartbeat.dev
+    depends_on:
+      - rabbitmq
+      - fossbilling
+      - mysql
+    container_name: billing-heartbeat-testing
+    restart: always
+    networks:
+      - billing_net_testing
+    env_file:
+      - .env
       
 volumes:
   fossbilling:
