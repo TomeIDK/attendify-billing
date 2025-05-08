@@ -57,16 +57,17 @@ while (true) {
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
             }
-            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {                       
+            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {    
+                echo " [*] Generating UID...";
                 $row['uid'] = 'FB' . round(microtime(true) * 1000); 
-
+                echo " [x] UID '{$row['uid']}' generated.";
                 //Update client.custom_2
                 $clientUpdate = $pdo->prepare(
-                    'UPDATE client SET custom_2 = :uid WHERE email = :email'
+                    'UPDATE client SET custom_2 = :uid WHERE id = :id'
                 );
                 $clientUpdate->execute([
                     ':uid' => $row['uid'],
-                    ':email' => $row['email']
+                    ':id' => $row['id']
                 ]);
             }
             processRow($row, $row['operation'], $channel);
