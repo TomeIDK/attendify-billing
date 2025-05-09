@@ -3,121 +3,102 @@
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
 
-use Dotenv\Dotenv;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
-define("INTERVAL", 5); // interval between db polling
-declare(ticks = 1); 
-$dotenv = Dotenv::createImmutable(__DIR__ . '/..'); 
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
-// MySQL credentials
-$host = $_ENV['MYSQL_HOST'];
-$db = $_ENV['MYSQL_DB'];
-$user = $_ENV['MYSQL_USER'];
-$pass = $_ENV['MYSQL_PASSWORD'];
-$charset = 'utf8mb4';
-$port       = getenv('MYSQL_PORT');
+// DB setup
+$pdo = new PDO(
+    "mysql:host={$_ENV['MYSQL_HOST']};port={$_ENV['MYSQL_PORT']};dbname={$_ENV['MYSQL_DB']};charset=utf8mb4",
+    $_ENV['MYSQL_USER'],
+    $_ENV['MYSQL_PASSWORD'],
+    [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]
+);
 
-// create pdo instance
-$dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-];
-$pdo = new PDO($dsn, $user, $pass, $options);
-
-// RabbitMQ credentials
+// RabbitMQ setup
 $connection = new AMQPStreamConnection(
-        $_ENV['RABBITMQ_HOST'],
-        $_ENV['RABBITMQ_PORT'],
-        $_ENV['RABBITMQ_USER'],
+    $_ENV['RABBITMQ_HOST'],
+    $_ENV['RABBITMQ_PORT'],
+    $_ENV['RABBITMQ_USER'],
     $_ENV['RABBITMQ_PASSWORD'],
-       $_ENV['RABBITMQ_VHOST']
-              
+    $_ENV['RABBITMQ_VHOST']
 );
 $channel = $connection->channel();
+$channel->queue_declare('invoice_xml', false, true, false, false);
+$channel->exchange_declare('invoice', 'direct', false, true, false);
 
+register_shutdown_function(fn() => shutdownHandler($channel, $connection));
 
-// close connection if shutdown command is given (CTRL+C)
-if (function_exists('pcntl_signal')) {
-    pcntl_signal(SIGINT, function() use ($channel, $connection) {
-        shutdownHandler($channel, $connection);
-    });
-} else {
-    register_shutdown_function(function() use ($channel, $connection) {
-        shutdownHandler($channel, $connection);
-    });
-}
-echo " [*] Polling the invoice table. Press CTRL+C to exit.\n";
+$callback = function (AMQPMessage $msg) use ($pdo, $channel) {
+    echo " [>] Received XML, creating invoice...\n";
 
-while (true) {
-    // fetch all unprocessed invoices (add a 'processed' column if you don't have one)
-    $statement = $pdo->prepare("SELECT * FROM invoice WHERE processed = FALSE");
+    $xml = simplexml_load_string($msg->body);
 
-    try {
-        $statement->execute();
-        $count = $statement->rowCount();
-        echo " [x] Found {$count} unprocessed invoice(s).\n";
+    $clientId = (int) $xml->invoice->client_id;
+    $date = (string) $xml->invoice->date;
+    $createdAt = date('Y-m-d H:i:s', strtotime($date));
+    $dueAt = date('Y-m-d H:i:s', strtotime($date . ' +5 days'));
+    $currency = (string) ($xml->invoice->currency ?? 'USD');
+    $hash = bin2hex(random_bytes(16));
 
-        while ($row = $statement->fetch()) {
-            echo " [*] Processing invoice #{$row['id']} for client #{$row['client_id']}.\n";
-            sendPdfLink($row, $channel);
-            markInvoiceAsProcessed($row['id'], $pdo);
-        }
-    } catch (PDOException $e) {
-        echo " [!] Database error: " . $e->getMessage() . "\n";
+    $stmt = $pdo->prepare("INSERT INTO invoice (client_id, currency, status, created_at, due_at, hash, processed)
+                           VALUES (?, ?, 'unpaid', ?, ?, ?, 0)");
+    $stmt->execute([$clientId, $currency, $createdAt, $dueAt, $hash]);
+    $invoiceId = $pdo->lastInsertId();
+
+    foreach ($xml->invoice->item as $item) {
+        $title = (string) $item->title;
+        $quantity = (int) $item->quantity;
+        $price = (float) $item->price;
+        $taxed = (int) $item->taxed;
+
+        $stmt = $pdo->prepare("INSERT INTO invoice_item (invoice_id, title, quantity, price, taxed)
+                               VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$invoiceId, $title, $quantity, $price, $taxed]);
     }
-    sleep(INTERVAL);
-}
 
-// Send PDF download link through RabbitMQ
-function sendPdfLink($invoiceData, $channel) {
-    $pdfUrl = 'http://localhost:8081/invoice/pdf/' . $invoiceData['hash'];
+    $pdfUrl = $_ENV['FOSSBILLING_URL'] . "/invoice/pdf/" . $hash;
     $message = [
         'info' => [
             'sender' => 'billing',
             'operation' => 'pdf_ready'
         ],
         'pdf' => [
-            'invoice_id' => $invoiceData['id'],
-            'client_id' => $invoiceData['client_id'],
+            'invoice_id' => $invoiceId,
+            'client_id' => $clientId,
             'url' => $pdfUrl
         ]
     ];
 
-    $xml = new SimpleXMLElement("<attendify/>");
-    arrayToXml($message, $xml);
+    $xmlResponse = new SimpleXMLElement("<attendify/>");
+    arrayToXml($message, $xmlResponse);
 
     $dom = new DOMDocument("1.0");
     $dom->preserveWhiteSpace = false;
     $dom->formatOutput = true;
-    $dom->loadXML($xml->asXML());
+    $dom->loadXML($xmlResponse->asXML());
 
-    $msg = new AMQPMessage($dom->saveXML(), ['content-type' => 'application/xml']);
-    $channel->basic_publish($msg, 'invoice', 'pdf.ready');
+    $msgOut = new AMQPMessage($dom->saveXML(), ['content-type' => 'application/xml']);
+    $channel->basic_publish($msgOut, 'invoice', 'pdf.ready');
 
-    echo " [✔] PDF link sent for invoice #{$invoiceData['id']}\n";
+    echo " [✔] Invoice #$invoiceId created and PDF link sent.\n";
+};
+
+$channel->basic_consume('invoice_xml', '', false, true, false, false, $callback);
+
+while ($channel->is_consuming()) {
+    $channel->wait();
 }
 
-// Mark invoice as processed
-function markInvoiceAsProcessed($id, $pdo) {
-    $stmt = $pdo->prepare("UPDATE invoice SET processed = 1 WHERE id = :id");
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    $stmt->execute();
-}
-
-// Shutdown handler
-function shutdownHandler($channel, $connection) {
-    echo " [x] Closing RabbitMQ connection...\n";
+function shutdownHandler($channel, $connection)
+{
+    echo " [x] Shutting down.\n";
     $channel->close();
     $connection->close();
     exit(0);
 }
-
-$channel->basic_consume('invoice_queue', '', false, true, false, false, $callback);
-
-while ($channel->is_consuming()) {
-    $channel->wait();
-} 

@@ -7,65 +7,57 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->safeload();
+$dotenv->load();
 
-// --- RABBITMQ CONNECTION ---
-try {
-    $connection = new AMQPStreamConnection(
-        $_ENV['RABBITMQ_HOST'] ?? 'localhost',
-        $_ENV['RABBITMQ_PORT'] ?? '5672',
-        $_ENV['RABBITMQ_USER'] ?? 'attendify',
-        $_ENV['RABBITMQ_PASSWORD'] ?? 'rabbitmq',
-        $_ENV['RABBITMQ_VHOST'] ?? 'attendify'
-    );
-    $channel = $connection->channel();
+// Connect to RabbitMQ
+$connection = new AMQPStreamConnection(
+    $_ENV['RABBITMQ_HOST'],
+    $_ENV['RABBITMQ_PORT'],
+    $_ENV['RABBITMQ_USER'],
+    $_ENV['RABBITMQ_PASSWORD'],
+    $_ENV['RABBITMQ_VHOST']
+);
+$channel = $connection->channel();
 
-    // Declare the exchange
-    $channel->exchange_declare('invoice', 'direct', false, true, false);
+// Declare durable named queue and bind to exchange
+$queueName = 'pdf_notifications';
+$channel->exchange_declare('invoice', 'direct', false, true, false);
+$channel->queue_declare($queueName, false, true, false, false);
+$channel->queue_bind($queueName, 'invoice', 'pdf.ready');
 
-    // Declare a queue
-    list($queue_name, ,) = $channel->queue_declare("", false, false, true, false);
+echo " [*] Waiting for pdf.ready messages on '$queueName'. Press CTRL+C to exit\n";
 
-    // Bind the queue to the exchange with the routing key
-    $channel->queue_bind($queue_name, 'invoice', 'pdf.ready');
+// Handle incoming messages
+$callback = function (AMQPMessage $msg) {
+    echo " [x] Received message on routing key '{$msg->getRoutingKey()}'.\n";
 
-    echo " [*] Waiting for invoice messages. To exit press CTRL+C\n";
-
-    $callback = function ($msg) {
-        echo " [x] Received message:\n";
-        echo "     Content: " . $msg->body . "\n";
-        echo "     Routing Key: " . $msg->getRoutingKey() . "\n";
-        echo "     Exchange: " . $msg->getExchange() . "\n";
-        echo "     Content Type: " . $msg->get('content_type') . "\n";
-        echo " [x] Done\n";
-    };
-
-    $channel->basic_consume($queue_name, '', false, true, false, false, $callback);
-
-    while ($channel->is_consuming()) {
-        $channel->wait();
+    $xmlContent = $msg->body;
+    $xml = simplexml_load_string($xmlContent);
+    if (!$xml) {
+        echo " [!] Failed to parse XML\n";
+        return;
     }
 
-} catch (Exception $e) {
-    die(" [x] Failed to connect to RabbitMQ: " . $e->getMessage() . "\n");
-}
+    $data = json_decode(json_encode($xml), true);
 
-// Shutdown handler
-function shutdownHandler($channel, $connection) {
+    $invoiceId = $data['pdf']['invoice_id'] ?? 'N/A';
+    $clientId = $data['pdf']['client_id'] ?? 'N/A';
+    $url = $data['pdf']['url'] ?? 'N/A';
+
+    echo " [→] Invoice #$invoiceId for client #$clientId is ready at:\n      $url\n";
+};
+
+// Start consuming
+$channel->basic_consume($queueName, '', false, true, false, false, $callback);
+
+// Graceful shutdown
+register_shutdown_function(function () use ($channel, $connection) {
     echo " [x] Closing RabbitMQ connection...\n";
     $channel->close();
     $connection->close();
     exit(0);
-}
+});
 
-// Register shutdown handler for both Windows and Unix-like systems
-if (function_exists('pcntl_signal')) {
-    pcntl_signal(SIGINT, function() use ($channel, $connection) {
-        shutdownHandler($channel, $connection);
-    });
-} else {
-    // For Windows, we'll use a simpler approach
-    register_shutdown_function(function() use ($channel, $connection) {
-        shutdownHandler($channel, $connection);
-    });
-} 
+while ($channel->is_consuming()) {
+    $channel->wait();
+}
