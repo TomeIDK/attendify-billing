@@ -72,6 +72,7 @@ while (true) {
                     WHERE id = :id"
                 );
                 try {
+                    echo " [*] Updating UID in DB for user #" . $row['id'] . " with UID " . $row['uid'] . " at " . $currentTime;
                     $currentTime = date('Y-m-d H:i:s');
                     $clientUpdate->execute([
                         ':uniqueid' => $row['uid'],
