@@ -221,11 +221,11 @@ function createEvent(array $e, PDO $pdo) {
     $sql = "INSERT INTO events
         (uid_event, name, start_date, end_date, address, description, max_attendees)
      VALUES
-        (:uid, :name, :start, :end, :addr, :desc, :max)";
+        (:uniqueid, :name, :start, :end, :addr, :desc, :max)";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
-            ':uid'   => $e['uid_event'],
+            ':uniqueid'   => $e['uid_event'],
             ':name'  => $e['name'],
             ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
             ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
@@ -251,10 +251,10 @@ function updateEvent(array $e, PDO $pdo) {
                 description= :desc,
                 max_attendees = :max,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE uid_event = :uid";
+            WHERE uid_event = :uniqueid";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        ':uid'   => $e['uid_event'],
+        ':uniqueid'   => $e['uid_event'],
         ':name'  => $e['name'],
         ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
         ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
@@ -273,8 +273,8 @@ function updateEvent(array $e, PDO $pdo) {
  * Delete an event from the events table.
  */
 function deleteEvent(array $e, PDO $pdo) {
-    $stmt = $pdo->prepare("DELETE FROM events WHERE uid_event = :uid");
-    $stmt->execute([':uid' => $e['uid_event']]);
+    $stmt = $pdo->prepare("DELETE FROM events WHERE uid_event = :uniqueid");
+    $stmt->execute([':uniqueid' => $e['uid_event']]);
     if ($stmt->rowCount() > 0) {
         echo " [✔] Event deleted: {$e['uid_event']}\n";
     } else {
