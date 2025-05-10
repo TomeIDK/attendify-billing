@@ -67,7 +67,7 @@ while (true) {
 
                 $clientUpdate = $pdo->prepare(
                     "UPDATE client SET 
-                        custom_2 = :uniqueid
+                        custom_2 = :uniqueid,
                         updated_at = :updated_at
                     WHERE id = :id"
                 );
