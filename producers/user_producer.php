@@ -27,8 +27,6 @@ $options = [
 ];
 $pdo = new PDO($dsn, $user, $pass, $options);
 
-$pdo->exec("SET @is_consumer_source = 1");
-
 // rabbitmq credentials
 $connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASSWORD'), getenv('RABBITMQ_VHOST'));
 $channel = $connection->channel();
@@ -53,22 +51,42 @@ while (true) {
 
         // process each row individually and publish a message
         while ($row = $statement->fetch()) {
-            echo " [*] Currently processing user #{$row['id']}: {$row['first_name']} {$row['last_name']} for {$row['operation']} operation.\n";
+            echo " [*] Currently processing user #{$row['client_id']}: {$row['first_name']} {$row['last_name']} for {$row['operation']} operation.\n";
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
             }
             if ($row['operation'] === 'CREATE' && empty($row['uid'])) {    
-                echo " [*] Generating UID...";
+                echo " [*] Generating UID...\n";
+
                 $row['uid'] = 'FB' . round(microtime(true) * 1000); 
-                echo " [x] UID '{$row['uid']}' generated.";
+
+                echo " [x] UID '{$row['uid']}' generated.\n";
                 //Update client.custom_2
+                $pdo->exec("SET @is_consumer_source = 1");
+
                 $clientUpdate = $pdo->prepare(
-                    'UPDATE client SET custom_2 = :uid WHERE id = :id'
+                    "UPDATE client SET 
+                        custom_2 = :uniqueid,
+                        updated_at = :updated_at
+                    WHERE id = :client_id"
                 );
-                $clientUpdate->execute([
-                    ':uid' => $row['uid'],
-                    ':id' => $row['id']
-                ]);
+                try {
+                    $currentTime = date('Y-m-d H:i:s');
+                    echo " [*] Updating UID in DB for user #" . $row['client_id'] . " with UID " . $row['uid'] . " at " . $currentTime . "\n";
+                    $clientUpdate->execute([
+                        ':uniqueid' => $row['uid'],
+                        ':updated_at' => $currentTime,
+                        ':client_id' => $row['client_id']
+                    ]);
+
+                    if ($clientUpdate->rowCount() === 0) {
+                        echo " [!] No rows affected. Update may have failed or was unnecessary.\n";
+                    }
+
+                }  catch (PDOException $e) {
+                    echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
+                }
+
             }
             processRow($row, $row['operation'], $channel);
             markAsProcessed($row['id'], $pdo);

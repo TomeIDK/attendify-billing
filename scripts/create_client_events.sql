@@ -1,6 +1,7 @@
 -- create user_events table
 CREATE TABLE user_events (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    client_id BIGINT NOT NULL,
     operation ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
     first_name VARCHAR(255) NOT NULL,
     last_name VARCHAR(255) NOT NULL,
@@ -20,8 +21,8 @@ AFTER INSERT ON client
 FOR EACH ROW
 BEGIN
     IF COALESCE(@is_consumer_source, 0) <> 1 THEN
-        INSERT INTO user_events (operation, first_name, last_name, email, title, uid, password)
-        VALUES ('INSERT', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.custom_2, NEW.pass);
+        INSERT INTO user_events (client_id, operation, first_name, last_name, email, title, uid, password)
+        VALUES (NEW.id, 'INSERT', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.custom_2, NEW.pass);
     END IF;
 END$$
 
@@ -31,8 +32,8 @@ AFTER UPDATE ON client
 FOR EACH ROW
 BEGIN
     IF COALESCE(@is_consumer_source, 0) <> 1 THEN
-        INSERT INTO user_events (operation, first_name, last_name, email, title, uid, password)
-        VALUES ('UPDATE', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.custom_2, NEW.pass);
+        INSERT INTO user_events (client_id, operation, first_name, last_name, email, title, uid, password)
+        VALUES (NEW.id, 'UPDATE', NEW.first_name, NEW.last_name, NEW.email, NEW.custom_1, NEW.custom_2, NEW.pass);
     END IF;
 END$$
 
@@ -42,8 +43,8 @@ AFTER DELETE ON client
 FOR EACH ROW
 BEGIN
     IF COALESCE(@is_consumer_source, 0) <> 1 THEN
-        INSERT INTO user_events (operation, first_name, last_name, email, title, uid, password)
-        VALUES ('DELETE', OLD.first_name, OLD.last_name, OLD.email, OLD.custom_1, OLD.custom_2, OLD.pass);
+        INSERT INTO user_events (client_id, operation, first_name, last_name, email, title, uid, password)
+        VALUES (OLD.id, 'DELETE', OLD.first_name, OLD.last_name, OLD.email, OLD.custom_1, OLD.custom_2, OLD.pass);
     END IF;
 END$$
 
