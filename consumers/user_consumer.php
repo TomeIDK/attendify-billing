@@ -167,6 +167,7 @@ function updateUser(array $data, PDO $pdo) {
 
     $sql = "UPDATE client SET
                 pass = :pass,
+                email = :email,
                 first_name = :first_name,
                 last_name = :last_name,
                 custom_1 = :custom_1,
