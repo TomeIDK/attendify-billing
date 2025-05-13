@@ -2,11 +2,13 @@
 
 // Update this path to point to the correct location of your parser.php file
 require_once __DIR__ . '/../../parser.php';
+require __DIR__ . '/vendor/autoload.php';
 
 use PHPUnit\Framework\TestCase;
 
 class ParserTest extends TestCase
 {
+    // Test XML to JSON conversion
     public function testXmlToJson()
     {
         // Fake XML to test with
@@ -41,7 +43,7 @@ class ParserTest extends TestCase
                 ]
             ]
         ];
-        
+
         // Convert the expected output to a JSON string with pretty print
         $expectedJsonString = json_encode($expectedJson, JSON_PRETTY_PRINT);
 
@@ -51,10 +53,10 @@ class ParserTest extends TestCase
         // Print both expected and actual JSON for comparison
         echo "Expected JSON:\n" . $expectedJsonString . "\n\n";
         echo "Actual JSON:\n" . $actualJson . "\n\n";
-        
+
         // Verify the output is valid JSON
         $this->assertJson($actualJson);
-        
+
         // Compare the actual result with expected result (ignoring formatting differences)
         $this->assertEquals(
             json_decode($expectedJsonString, true),
@@ -62,6 +64,8 @@ class ParserTest extends TestCase
             "The converted JSON doesn't match the expected output"
         );
     }
+
+    // Test JSON to XML conversion
     public function testJsonToXml()
     {
         // Fake JSON to test with
@@ -80,6 +84,8 @@ class ParserTest extends TestCase
                 }
             }
         }';
+        
+        // Expected XML output (formatted for readability)
         $ExpectedXml = '<?xml version="1.0"?>
                             <attendify>
                             <info>
@@ -95,15 +101,17 @@ class ParserTest extends TestCase
                             </user>
                             </attendify>';
 
-
         // Convert JSON to XML
         $ActualXml = JsonToxml($fakeJson);
-        
+
+        // Normalize XML by removing extra whitespace and indentation
+        $ExpectedXml = preg_replace('/\s+/', ' ', trim($ExpectedXml));
+        $ActualXml = preg_replace('/\s+/', ' ', trim($ActualXml));
+
         // Print both expected and actual XML for comparison
         echo "Expected XML:\n" . $ExpectedXml . "\n\n";
         echo "Actual XML:\n" . $ActualXml . "\n\n";
-                
-        
+
         // Compare the actual XML content with expected XML content
         $this->assertEquals(
             $ExpectedXml,
