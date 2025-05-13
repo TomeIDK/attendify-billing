@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../logger.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -85,6 +86,7 @@ while (true) {
 
                 }  catch (PDOException $e) {
                     echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
+                    sendLog($channel, "billing", "Error updating UID for client #{$row['client_id']}: " . $e->getMessage());
                 }
 
             }
@@ -93,12 +95,14 @@ while (true) {
         }
     } catch (PDOException $e) {
         echo " [!] Database error: " . $e->getMessage() . "\n";
+        sendLog($channel, "billing", "Database error while polling user_events: " . $e->getMessage());
     }
     sleep(INTERVAL);
 }
 
 // process user data 
-function processRow($userData, $operation, $channel) {  
+function processRow($userData, $operation, $channel) {
+    sendLog($channel, "user", "✅ reached processRow() for '{$userData['email']}' with op '{$operation}'");  
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
@@ -110,6 +114,7 @@ function processRow($userData, $operation, $channel) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Skipping...";
+            sendLog($channel, "billing", "Unknown operation '{$operation}'");
             return;
             break;
     }
@@ -164,6 +169,7 @@ function publishMessage($xmlString, $channel, $operation) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Canceled message publishing.";
+            sendLog($channel, "billing", "Canceled publish due to unknown operation '{$operation}'");
             return;
             break;
     }
