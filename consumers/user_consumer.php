@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
 
@@ -23,97 +22,120 @@ $port       = $_ENV['MYSQL_PORT'];
 
 // create pdo instance
 $dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
-$options = [
+$pdoOptions = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ];
-$pdo = new PDO($dsn, $user, $pass, $options);
+$pdo = new PDO($dsn, $user, $pass, $pdoOptions);
 
 // --- VERBINDING MET RABBITMQ ---
 $connection = new AMQPStreamConnection($_ENV['RABBITMQ_HOST'], $_ENV['RABBITMQ_PORT'], $_ENV['RABBITMQ_USER'], $_ENV['RABBITMQ_PASSWORD'], $_ENV['RABBITMQ_VHOST']);
 $channel    = $connection->channel();
 echo " [x] Connected to RabbitMQ.\n";
 
-// close connection if shutdown command is given (CTRL+C)
+// Graceful shutdown on CTRL+C
 pcntl_signal(SIGINT, function() use ($channel, $connection) {
-    shutdownHandler($channel, $connection);
+    echo " [x] Shutting down...\n";
+    $channel->close();
+    $connection->close();
+    exit(0);
 });
 
-// CONSUMER CALLBACK
-$callback = function (AMQPMessage $msg) use ($pdo) {
+// --- CONSUMER CALLBACK ---
+$callback = function(AMQPMessage $msg) use ($pdo) {
     echo " [x] Message received.\n";
     try {
-        // Parse de XML naar JSON en decoderen naar een array
         $jsonData = xmlToJson($msg->getBody());
-        $array = json_decode($jsonData, true);
+        $data = json_decode($jsonData, true)['attendify'];
         echo " [x] Parsed data.\n";
-        $data = $array['attendify'];
     } catch (Exception $e) {
         echo " [!] Error parsing XML: " . $e->getMessage() . "\n";
         return;
     }
-        echo " [x] Message sender is '{$data['info']['sender']}'\n";
 
-    // skip message if we are the sender
-    if ($data['info']['sender'] == 'billing') {
-        echo " Skipping...\n";
-        // $msg->ack();
+    echo " [x] Message sender is '{$data['info']['sender']}'\n";
+
+    // Skip messages sent by this service
+    if (isset($data['info']['sender']) && $data['info']['sender'] === 'billing') {
+        echo " Skipping self-published event.\n";
         return;
     }
 
-    $operation = $data['info']['operation'];
-    echo " [*] Operation to perform: " . $operation . "\n";
-    switch ($operation) {
-        case 'create':
-            createUser($data['user'], $pdo);
-            break;
-        case 'update':
-            updateUser($data['user'], $pdo);
-            break;
-        case 'delete':
-            deleteUser($data['user'], $pdo);
-            break;
-        default:
-            echo " [!] Error: Unknown operation '{$operation}'. Skipping...\n";
-            break;
+    $operation = $data['info']['operation'] ?? '';
+    echo " [*] Operation to perform: {$operation}\n";
+    
+    // Check which entity type is present in the message
+    if (isset($data['user'])) {
+        // Process user operations
+        switch ($operation) {
+            case 'create':
+                createUser($data['user'], $pdo);
+                break;
+            case 'update':
+                updateUser($data['user'], $pdo);
+                break;
+            case 'delete':
+                deleteUser($data['user'], $pdo);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for user. Skipping...\n";
+                break;
+        }
+    } elseif (isset($data['event'])) {
+        // Process event operations
+        switch ($operation) {
+            case 'create':
+                createEvent($data['event'], $pdo);
+                break;
+            case 'update':
+                updateEvent($data['event'], $pdo);
+                break;
+            case 'delete':
+                deleteEvent($data['event'], $pdo);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for event. Skipping...\n";
+                break;
+        }
+    } else {
+        echo " [!] No recognized entity type in message. Skipping...\n";
     }
+
     $msg->ack();
 };
 
-$channel->basic_consume("billing.user", '', false, false, false, false, $callback);
+// Declare which queues to consume from
+$queues = ['billing.invoice', 'billing.user'];
+
+// Set up consumption from both queues
+foreach ($queues as $queue) {
+    $channel->basic_consume($queue, '', false, false, false, false, $callback);
+    echo " [*] Consuming from queue: $queue\n";
+}
 
 echo " [*] Waiting for messages. Press CTRL+C to exit.\n";
+
+// Process messages from any of the queues
 while ($channel->is_consuming()) {
     $channel->wait();
 }
 
-/**
- * Bouwt één adresstring door street, number en bus_number te combineren.
- * => currently unnecessary -Cedric
- */
-// function buildAddress(array $address): string {
-//     $addr = trim($address['street'] . ' ' . $address['number']);
-//     if (!empty($address['bus_number'])) {
-//         $addr .= ' bus ' . trim($address['bus_number']);
-//     }
-//     return $addr;
-// }
+
+// --- USER CRUD FUNCTIONS ---
 
 /**
- * Voegt een nieuwe gebruiker toe in de fossbilling database.
- * Mapped enkel de velden die beschikbaar zijn in de tabel 'client'.
+ * Insert a new user into the users table.
  */
 function createUser(array $data, PDO $pdo) {
     $currentTime = date('Y-m-d H:i:s');
-    // $address1 = buildAddress($data['address']);
 
-    // set session variable to indicate consumer is making the change
+    // Set session variable to indicate consumer is making the change
     $pdo->exec("SET @is_consumer_source = 1");
 
     $sql = "INSERT INTO client (
-                email, pass, first_name, last_name, custom_1, created_at, updated_at
+                email, pass, first_name, last_name, custom_1, custom_2, created_at, updated_at
             ) VALUES (
-                :email, :pass, :first_name, :last_name, :custom_1, :created_at, :updated_at
+                :email, :pass, :first_name, :last_name, :custom_1, :custom_2, :created_at, :updated_at
             )";
     $stmt = $pdo->prepare($sql);
     try {
@@ -123,6 +145,7 @@ function createUser(array $data, PDO $pdo) {
             ':first_name'     => $data['first_name'],
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
+            ':custom_2'       => $data['uid'],
             ':created_at'     => $currentTime,
             ':updated_at'     => $currentTime,
         ]);
@@ -130,7 +153,6 @@ function createUser(array $data, PDO $pdo) {
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
             echo " [!] User with email {$data['email']} already exists. Skipping...\n";
-            // updateUser($data, $pdo); => Needs to discussed with other services -Cedric
         } else {
             echo " [!] Error: Database failed to create user.\n" . $e->getMessage() . "\n";
         }
@@ -138,20 +160,19 @@ function createUser(array $data, PDO $pdo) {
 }
 
 /**
- * Wijzigt een bestaande gebruiker in de fossbilling database.
- * Update enkel de velden die beschikbaar zijn in de tabel 'client'.
+ * Update an existing user in the users table.
  */
 function updateUser(array $data, PDO $pdo) {
     $currentTime = date('Y-m-d H:i:s');
-    // $address1 = buildAddress($data['address']);
 
     $sql = "UPDATE client SET
                 pass = :pass,
+                email = :email,
                 first_name = :first_name,
                 last_name = :last_name,
                 custom_1 = :custom_1,
                 updated_at = :updated_at
-            WHERE email = :email";
+            WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
@@ -160,12 +181,14 @@ function updateUser(array $data, PDO $pdo) {
             ':first_name'     => $data['first_name'],
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
+            ':custom_2'       => $data['uid'],
             ':updated_at'     => $currentTime,
         ]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User updated with email: {$data['email']}\n";
+            echo " [✔] User updated with UID: {$data['uid']}\n";
         } else {
-            echo " [!] Geen gebruiker bijgewerkt met email: {$data['email']}. Controleer of deze bestaat.\n";
+            echo " [!] No user found to update with UID: {$data['uid']}. Check if it exists.\n";
+          
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
@@ -173,27 +196,89 @@ function updateUser(array $data, PDO $pdo) {
 }
 
 /**
- * Verwijdert een gebruiker uit de fossbilling database op basis van het emailadres.
+ * Delete a user from the users table.
  */
 function deleteUser(array $data, PDO $pdo) {
-    $sql = "DELETE FROM client WHERE email = :email";
+    $sql = "DELETE FROM client WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
-        $stmt->execute([':email' => $data['email']]);
+        $stmt->execute([':custom_2' => $data['uid']]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User successfully deleted with email: {$data['email']}\n";
+            echo " [✔] User successfully deleted with UID: {$data['uid']}\n";
         } else {
-            echo " [!] No user found with email: {$data['email']}.\n";
+            echo " [!] No user found with UID: {$data['uid']}.\n";
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
     }
 }
 
-// shutdown command handler
-function shutdownHandler($channel, $connection) {
-    echo " [x] Closing RabbitMQ connection...\n";
-    $channel->close();
-    $connection->close();
-    exit(0);
-};
+// --- EVENT CRUD FUNCTIONS ---
+
+/**
+ * Insert a new event into the events table.
+ */
+function createEvent(array $e, PDO $pdo) {
+    $sql = "INSERT INTO events
+        (uid_event, name, start_date, end_date, address, description, max_attendees)
+     VALUES
+        (:uniqueid, :name, :start, :end, :addr, :desc, :max)";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':uniqueid'   => $e['uid_event'],
+            ':name'  => $e['name'],
+            ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
+            ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
+            ':addr'  => $e['address'],
+            ':desc'  => $e['description'] ?? null,
+            ':max'   => (int) trim($e['max_attendees'] ?? 0),
+        ]);
+        echo " [✔] Event created: {$e['uid_event']}\n";
+    } catch (PDOException $ex) {
+        echo " [!] Failed to create event {$e['uid_event']}: " . $ex->getMessage() . "\n";
+    }
+}
+
+/**
+ * Update an existing event in the events table.
+ */
+function updateEvent(array $e, PDO $pdo) {
+    $sql = "UPDATE events SET
+                name = :name,
+                start_date = :start,
+                end_date   = :end,
+                address    = :addr,
+                description= :desc,
+                max_attendees = :max,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE uid_event = :uniqueid";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':uniqueid'   => $e['uid_event'],
+        ':name'  => $e['name'],
+        ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
+        ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
+        ':addr'  => $e['address'],
+        ':desc'  => $e['description'] ?? null,
+        ':max'   => (int) trim($e['max_attendees'] ?? 0),
+    ]);
+    if ($stmt->rowCount() > 0) {
+        echo " [✔] Event updated: {$e['uid_event']}\n";
+    } else {
+        echo " [!] No event found to update: {$e['uid_event']}\n";
+    }
+}
+
+/**
+ * Delete an event from the events table.
+ */
+function deleteEvent(array $e, PDO $pdo) {
+    $stmt = $pdo->prepare("DELETE FROM events WHERE uid_event = :uniqueid");
+    $stmt->execute([':uniqueid' => $e['uid_event']]);
+    if ($stmt->rowCount() > 0) {
+        echo " [✔] Event deleted: {$e['uid_event']}\n";
+    } else {
+        echo " [!] No event found to delete: {$e['uid_event']}\n";
+    }
+}

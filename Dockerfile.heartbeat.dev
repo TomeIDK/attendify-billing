@@ -27,19 +27,19 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 WORKDIR /app
 
 # copy composer files
-COPY consumers/composer.json consumers/composer.lock ./consumers/
+COPY heartbeat/composer.json heartbeat/composer.lock ./heartbeat/
 
-# copy consumers code
-COPY consumers/ /app/consumers/
+# copy producers code
+COPY heartbeat/*.php /app/heartbeat/
 
 # copy utility files
 COPY parser.php /app
 
 # install composer dependencies
-RUN composer install --no-dev --prefer-dist --no-progress --working-dir=/app/consumers
+RUN composer install --prefer-dist --no-progress --working-dir=/app/heartbeat
 
 # grant permissions
-# RUN chown -R www-data:www-data /app
+# RUN chown -R www-data:www-data /app/producers/vendor
 
 # set entrypoint
-CMD ["php", "./consumers/start.php"]
+CMD ["php", "./heartbeat/heartbeat.php"]

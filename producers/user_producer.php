@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
 
@@ -52,9 +51,42 @@ while (true) {
 
         // process each row individually and publish a message
         while ($row = $statement->fetch()) {
-            echo " [*] Currently processing user #{$row['id']}: {$row['first_name']} {$row['last_name']} for {$row['operation']} operation.\n";
+            echo " [*] Currently processing user #{$row['client_id']}: {$row['first_name']} {$row['last_name']} for {$row['operation']} operation.\n";
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
+            }
+            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {    
+                echo " [*] Generating UID...\n";
+
+                $row['uid'] = 'FB' . round(microtime(true) * 1000); 
+
+                echo " [x] UID '{$row['uid']}' generated.\n";
+                //Update client.custom_2
+                $pdo->exec("SET @is_consumer_source = 1");
+
+                $clientUpdate = $pdo->prepare(
+                    "UPDATE client SET 
+                        custom_2 = :uniqueid,
+                        updated_at = :updated_at
+                    WHERE id = :client_id"
+                );
+                try {
+                    $currentTime = date('Y-m-d H:i:s');
+                    echo " [*] Updating UID in DB for user #" . $row['client_id'] . " with UID " . $row['uid'] . " at " . $currentTime . "\n";
+                    $clientUpdate->execute([
+                        ':uniqueid' => $row['uid'],
+                        ':updated_at' => $currentTime,
+                        ':client_id' => $row['client_id']
+                    ]);
+
+                    if ($clientUpdate->rowCount() === 0) {
+                        echo " [!] No rows affected. Update may have failed or was unnecessary.\n";
+                    }
+
+                }  catch (PDOException $e) {
+                    echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
+                }
+
             }
             processRow($row, $row['operation'], $channel);
             markAsProcessed($row['id'], $pdo);
@@ -66,7 +98,7 @@ while (true) {
 }
 
 // process user data 
-function processRow($userData, $operation, $channel) {
+function processRow($userData, $operation, $channel) {  
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
@@ -96,6 +128,7 @@ function formatUser($userData) {
             "last_name" => $userData['last_name'],
             "email" => $userData['email'],
             "title" => $userData['title'],
+            "uid" => $userData['uid'],
             "password" => $userData['password']
         ]
     ];
