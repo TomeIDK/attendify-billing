@@ -1,6 +1,8 @@
 # dev compose file
 # includes rabbitmq, fossbilling, mysql, pub/sub
 networks:
+  attendify_net_testing:
+    external: true
   billing_net_testing:
     driver: bridge
 services:
