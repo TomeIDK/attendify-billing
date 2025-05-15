@@ -1,6 +1,8 @@
 # testing compose file
 # includes rabbitmq, fossbilling, mysql, pub/sub
 networks:
+  attendify_net_testing:
+    external: true
   billing_net_testing:
     driver: bridge
 services:
@@ -34,7 +36,7 @@ services:
       context: .
       dockerfile: Dockerfile.consumer.dev
     depends_on:
-      - rabbitmq
+      - rabbitmq-testing
       - fossbilling
       - mysql
     container_name: billing-consumer-testing
@@ -49,7 +51,7 @@ services:
       context: .
       dockerfile: Dockerfile.producer.dev
     depends_on:
-      - rabbitmq
+      - rabbitmq-testing
       - fossbilling
       - mysql
     container_name: billing-producer-testing
@@ -64,7 +66,7 @@ services:
       context: .
       dockerfile: Dockerfile.heartbeat.dev
     depends_on:
-      - rabbitmq
+      - rabbitmq-testing
       - fossbilling
       - mysql
     container_name: billing-heartbeat-testing
