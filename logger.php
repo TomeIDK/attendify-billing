@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/parser.php';
+require_once __DIR__ . '/app/../parser.php';
 use PhpAmqpLib\Message\AMQPMessage;
 
 /**
@@ -12,6 +12,7 @@ use PhpAmqpLib\Message\AMQPMessage;
  */
 function sendLog($channel, $service, $messageContent) {
     $timestamp = round(microtime(true) * 1000);
+
     $logData = [
         "sender" => "billing-$service",
         "timestamp" => $timestamp,
@@ -27,11 +28,6 @@ function sendLog($channel, $service, $messageContent) {
     $dom->loadXML($xml->asXML());
 
     $xmlString = $dom->saveXML();
-
-    // Declare exchange/queue/binding
-    $channel->exchange_declare('monitoring', 'topic', true, true, false);
-    $channel->queue_declare('monitoring.log', true, true, false, false);
-    $channel->queue_bind('monitoring.log', 'monitoring', 'monitoring.log');
 
     $msg = new AMQPMessage($xmlString, ['content_type' => 'application/xml']);
 

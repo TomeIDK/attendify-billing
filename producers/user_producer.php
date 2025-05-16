@@ -82,11 +82,11 @@ while (true) {
 
                     if ($clientUpdate->rowCount() === 0) {
                         echo " [!] No rows affected. Update may have failed or was unnecessary.\n";
+                        sendLog($channel, "user", "No rows affected while updating UID for client #{$row['client_id']}. Possibly missing client.");
                     }
 
                 }  catch (PDOException $e) {
                     echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
-                    sendLog($channel, "billing", "Error updating UID for client #{$row['client_id']}: " . $e->getMessage());
                 }
 
             }
@@ -95,14 +95,14 @@ while (true) {
         }
     } catch (PDOException $e) {
         echo " [!] Database error: " . $e->getMessage() . "\n";
-        sendLog($channel, "billing", "Database error while polling user_events: " . $e->getMessage());
+        sendLog($channel, "user", "Database error while polling user_events: " . $e->getMessage());
     }
     sleep(INTERVAL);
 }
 
 // process user data 
 function processRow($userData, $operation, $channel) {
-    sendLog($channel, "user", "✅ reached processRow() for '{$userData['email']}' with op '{$operation}'");  
+    sendLog($channel, "user", "reached processRow() for '{$userData['email']}' with op '{$operation}'");  
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
@@ -114,7 +114,7 @@ function processRow($userData, $operation, $channel) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Skipping...";
-            sendLog($channel, "billing", "Unknown operation '{$operation}'");
+            sendLog($channel, "user", "Unknown operation '{$operation}'");
             return;
             break;
     }
