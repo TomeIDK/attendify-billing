@@ -133,9 +133,9 @@ function createUser(array $data, PDO $pdo) {
     $pdo->exec("SET @is_consumer_source = 1");
 
     $sql = "INSERT INTO client (
-                email, pass, first_name, last_name, custom_1, custom_2, created_at, updated_at
+                email, pass, first_name, last_name, custom_1, custom_2, custom_3, created_at, updated_at
             ) VALUES (
-                :email, :pass, :first_name, :last_name, :custom_1, :custom_2, :created_at, :updated_at
+                :email, :pass, :first_name, :last_name, :custom_1, :custom_2, :custom_3, :created_at, :updated_at
             )";
     $stmt = $pdo->prepare($sql);
     try {
@@ -146,6 +146,7 @@ function createUser(array $data, PDO $pdo) {
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
             ':custom_2'       => $data['uid'],
+            ':custom_3'       => $data['is_admin'],
             ':created_at'     => $currentTime,
             ':updated_at'     => $currentTime,
         ]);
@@ -171,6 +172,7 @@ function updateUser(array $data, PDO $pdo) {
                 first_name = :first_name,
                 last_name = :last_name,
                 custom_1 = :custom_1,
+                custom_3 = :custom_3,
                 updated_at = :updated_at
             WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
@@ -182,6 +184,7 @@ function updateUser(array $data, PDO $pdo) {
             ':last_name'      => $data['last_name'],
             ':custom_1'       => trim($data['title']),
             ':custom_2'       => $data['uid'],
+            ':custom_3'       => $data['is_admin'],
             ':updated_at'     => $currentTime,
         ]);
         if ($stmt->rowCount() > 0) {
