@@ -32,7 +32,7 @@ $xmlContent = file_get_contents($xmlFile);
 $msgOut = new AMQPMessage($xmlContent, ['content-type' => 'application/xml']);
 $channel->basic_publish($msgOut, 'invoice', 'invoice.created');
 
-echo " [✔] Sent purchase message to queue.\n";
+echo " Sent purchase message to queue.\n";
 
 $channel->close();
 $connection->close();

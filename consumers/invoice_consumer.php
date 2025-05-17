@@ -35,16 +35,16 @@ $channel->exchange_declare('invoice', 'direct', false, true, false);
 $channel->queue_declare('invoice_xml', false, true, false, false);
 $channel->queue_bind('invoice_xml', 'invoice', 'invoice.created');
 
-echo " [*] Waiting for purchase messages on 'invoice_xml'. Press CTRL+C to exit\n";
+echo " Waiting for purchase messages on 'invoice_xml'. Press CTRL+C to exit\n";
 
 $callback = function (AMQPMessage $msg) use ($pdo, $channel) {
-    echo " [x] Received purchase message\n";
+    echo "Received purchase message\n";
 
-    echo " [>] Raw message:\n" . $msg->body . "\n";
+    echo " Raw message:\n" . $msg->body . "\n";
 
     $xml = simplexml_load_string($msg->body);
     if (!$xml) {
-        echo " [!] Invalid XML\n";
+        echo " Invalid XML\n";
         return;
     }
 
@@ -64,7 +64,7 @@ $callback = function (AMQPMessage $msg) use ($pdo, $channel) {
     if ($invoice) {
         $invoiceId = $invoice['id'];
         $hash = $invoice['hash'];
-        echo " [ℹ] Using existing invoice #$invoiceId\n";
+        echo " Using existing invoice #$invoiceId\n";
     } else {
         $hash = bin2hex(random_bytes(16));
         $stmt = $pdo->prepare("INSERT INTO invoice (client_id, currency, status, created_at, due_at, hash)
@@ -77,7 +77,7 @@ $callback = function (AMQPMessage $msg) use ($pdo, $channel) {
     $items = $xml->invoice->item;
     if (!is_array($items) && !is_object($items)) {
         $items = [$items]; 
-}
+    }
 
     foreach($items as $item){
         $title = (string) $item->title;
@@ -91,7 +91,30 @@ $callback = function (AMQPMessage $msg) use ($pdo, $channel) {
         echo " [→] Added item '$title' to invoice #$invoiceId\n";
     }
 
-    // Send PDF-ready message
+    // Controleer of het event voor deze client afgelopen is
+    $stmt = $pdo->prepare("SELECT e.end_date
+        FROM events e
+        JOIN registrations r ON r.event_id = e.id
+        WHERE r.client_id = ?
+        ORDER BY e.end_date DESC
+        LIMIT 1");
+    $stmt->execute([$clientId]);
+    $event = $stmt->fetch();
+
+    if (!$event) {
+        echo " Geen event gevonden voor client $clientId. PDF wordt niet verzonden.\n";
+        return;
+    }
+
+    $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $endDate = new DateTimeImmutable($event['end_date'], new DateTimeZone('UTC'));
+
+    if ($endDate > $now) {
+        echo "Event nog niet afgelopen (eindigt op {$event['end_date']}). PDF wordt later verzonden.\n";
+        return;
+    }
+
+    // Stuur pas nu PDF-ready bericht
     $pdfUrl = $_ENV['FOSSBILLING_URL'] . "/invoice/pdf/" . $hash;
     $message = [
         'info' => ['sender' => 'billing', 'operation' => 'pdf_ready'],
@@ -109,7 +132,7 @@ $callback = function (AMQPMessage $msg) use ($pdo, $channel) {
     $msgOut = new AMQPMessage($dom->saveXML(), ['content-type' => 'application/xml']);
     $channel->basic_publish($msgOut, 'invoice', 'pdf.ready');
 
-    echo " [✔] Published PDF URL to queue.\n";
+    echo "Published PDF URL to queue.\n";
 };
 
 // Start consuming
