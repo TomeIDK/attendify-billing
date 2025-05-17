@@ -133,7 +133,8 @@ function formatUser($userData) {
             "email" => $userData['email'],
             "title" => $userData['title'],
             "uid" => $userData['uid'],
-            "password" => $userData['password']
+            "password" => $userData['password'],
+            "is_admin" => $userData['is_admin']
         ]
     ];
 
