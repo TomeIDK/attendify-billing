@@ -14,5 +14,5 @@ CREATE TABLE company (
     billing_address_postcode VARCHAR(255) NOT NULL,
     billing_address_city VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
-    phone VARCHAR(50) NOT NULL,
+    phone VARCHAR(50) NOT NULL
 );
