@@ -8,7 +8,6 @@ use PhpAmqpLib\Message\AMQPMessage;
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->safeload();
 
-define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // --- DATABASE CONNECTIE via PDO ---
@@ -97,6 +96,46 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
                 echo " [!] Unknown operation '{$operation}' for event. Skipping...\n";
                 break;
         }
+    } elseif (isset($data['companies'])) {
+        // Process company operations
+        switch ($operation) {
+            case 'create':
+                createCompany($data['companies'], $pdo);
+                break;
+            case 'update':
+                updateCompany($data['companies'], $pdo);
+                break;
+            case 'delete':
+                deleteCompany($data['companies'], $pdo);
+                unregisterAllUsersFromCompany($data['companies'], $pdo);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for event. Skipping...\n";
+                break;
+        }
+    } elseif (isset($data['company_employee'])) {
+        // Process company employee operations
+        switch ($operation) {
+            case 'register':
+                $companyData = getCompany($data['company_employee'], $pdo);
+                if ($companyData == null){ 
+                    echo " [!] No company found with UID: {$data['company_id']}. Check if it exists.\n";
+                    break;
+                }
+
+                $data['company_employee']['name'] = $companyData['name'];
+                $data['company_employee']['company_number'] = $companyData['company_number'];
+                $data['company_employee']['vat_number'] = $companyData['vat_number'];
+
+                registerCompanyEmployee($data['company_employee'], $pdo);
+                break;
+            case 'unregister':
+                unregisterCompanyEmployee($data['company_employee'], $pdo);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";
+                break;
+        }
     } else {
         echo " [!] No recognized entity type in message. Skipping...\n";
     }
@@ -166,6 +205,9 @@ function createUser(array $data, PDO $pdo) {
 function updateUser(array $data, PDO $pdo) {
     $currentTime = date('Y-m-d H:i:s');
 
+    // set session variable
+    $pdo->exec("SET @is_consumer_source = 1");
+
     $sql = "UPDATE client SET
                 pass = :pass,
                 email = :email,
@@ -202,6 +244,10 @@ function updateUser(array $data, PDO $pdo) {
  * Delete a user from the users table.
  */
 function deleteUser(array $data, PDO $pdo) {
+
+    // set session variable
+    $pdo->exec("SET @is_consumer_source = 1");
+
     $sql = "DELETE FROM client WHERE custom_2 = :custom_2";
     $stmt = $pdo->prepare($sql);
     try {
@@ -284,4 +330,235 @@ function deleteEvent(array $e, PDO $pdo) {
     } else {
         echo " [!] No event found to delete: {$e['uid_event']}\n";
     }
+}
+
+
+// --- COMPANIES CRUD FUNCTIONS ---
+
+/**
+ * insert a new company into the company table.
+ */
+function createCompany(array $data, PDO $pdo) {
+    $sql = "INSERT INTO company (
+                uid, owner_id, name, company_number, vat_number, address_street, address_number, address_postcode, address_city, billing_address_street, billing_address_number, billing_address_postcode, billing_address_city, email, phone
+            ) VALUES (
+                :uid, :owner_id, :name, :company_number, :vat_number, :address_street, :address_number, :address_postcode, :address_city, :billing_address_street, :billing_address_number, :billing_address_postcode, :billing_address_city, :email, :phone
+            )";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':uid' => $data['uid'],
+            ':owner_id' => $data['owner_id'],
+            ':name' => trim($data['name']),
+            ':company_number' => $data['company_number'],
+            ':vat_number' => $data['vat_number'],
+            ':address_street' => $data['address_street'],
+            ':address_number' => $data['address_number'],
+            ':address_postcode' => $data['address_postcode'],
+            ':address_city' => $data['address_city'],
+            ':billing_address_street' => $data['billing_address_street'],
+            ':billing_address_number' => $data['billing_address_number'], 
+            ':billing_address_postcode' => $data['billing_address_postcode'], 
+            ':billing_address_city' => $data['billing_address_city'], 
+            ':email' => $data['email'], 
+            ':phone' => $data['phone']
+        ]);
+        echo " [✔] Company {$data['name']} created successfully: {$data['uid']}\n";
+    } catch (PDOException $e) {
+        if ($e->getCode() == 23000) {
+            echo " [!] Company with UID {$data['uid']} already exists. Skipping...\n";
+        } else {
+            echo " [!] Error: Database failed to create company.\n" . $e->getMessage() . "\n";
+        }
+    }
+}
+
+/**
+ * Update an existing user in the users table.
+ */
+function updateCompany(array $data, PDO $pdo) {
+    $sql = "UPDATE company SET
+                owner_id = :owner_id,
+                name = :name,
+                company_number = :company_number,
+                vat_number = :vat_number,
+                address_street = :address_street,
+                address_number = :address_number,
+                address_postcode = :address_postcode,
+                address_city = :address_city,
+                billing_address_street = :billing_address_street,
+                billing_address_number = :billing_address_number,
+                billing_address_postcode = :billing_address_postcode,
+                billing_address_city = :billing_address_city,
+                email = :email,
+                phone = :phone
+            WHERE uid = :uid";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':owner_id' => $data['owner_id'],
+            ':name' => trim($data['name']),
+            ':company_number' => $data['company_number'],
+            ':vat_number' => $data['vat_number'],
+            ':address_street' => $data['address_street'],
+            ':address_number' => $data['address_number'],
+            ':address_postcode' => $data['address_postcode'],
+            ':address_city' => $data['address_city'],
+            ':billing_address_street' => $data['billing_address_street'],
+            ':billing_address_number' => $data['billing_address_number'],
+            ':billing_address_postcode' => $data['billing_address_postcode'],
+            ':billing_address_city' => $data['billing_address_city'],
+            ':email' => $data['email'],
+            ':phone' => $data['phone'],
+            ':uid' => $data['uid']
+        ]);
+        if ($stmt->rowCount() > 0) {
+            echo " [✔] Company updated with UID: {$data['uid']}\n";
+        } else {
+            echo " [!] No company found to update with UID: {$data['uid']}. Check if it exists.\n";
+          
+        }
+    } catch (PDOException $e) {
+        echo " [!] Error: Database failed to update company.\n" . $e->getMessage() . "\n";
+    }
+
+    // set uid to owner_id for compatibility with registerCompanyEmployee()
+    
+    $employeeData = $data;
+    $employeeData['uid'] = $data['owner_id'];
+
+    // add owner to company
+    registerCompanyEmployee($data, $pdo);
+}
+
+/**
+ * Delete a user from the users table.
+ */
+function deleteCompany(array $data, PDO $pdo) {
+    $sql = "DELETE FROM company WHERE uid = :uid";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([':uid' => $data['uid']]);
+        if ($stmt->rowCount() > 0) {
+            echo " [✔] Company successfully deleted with UID: {$data['uid']}\n";
+        } else {
+            echo " [!] No company found with UID: {$data['uid']}.\n";
+        }
+    } catch (PDOException $e) {
+        echo " [!] Error: Database failed to delete company.\n" . $e->getMessage() . "\n";
+    }
+}
+
+
+// --- COMPANY_EMPLOYEE CRUD FUNCTIONS ---
+
+/**
+ * register a user with a company.
+ */
+function registerCompanyEmployee(array $data, PDO $pdo) {
+        $sql = "UPDATE client SET
+            company = :name,
+            company_number = :company_number,
+            company_vat = :vat_number
+        WHERE custom_2 = :uid";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':name' => trim($data['name']),
+            ':company_number' => $data['company_number'],
+            ':vat_number' => $data['vat_number'],
+            ':uid' => $data['uid']
+        ]);
+        if ($stmt->rowCount() > 0) {
+            echo " [✔] User {$data['uid']} registered with company {$data['company_id']}.\n";
+        } else {
+            echo " [!] No user found to register with UID: {$data['uid']}. Check if it exists.\n";
+        }
+    } catch (PDOException $e) {
+        echo " [!] Error: Database failed to register user {$data['uid']} with company {$data['company_id']}.\n" . $e->getMessage() . "\n";
+    }
+}
+
+/**
+ * unregister a user with a company.
+ */
+function unregisterCompanyEmployee(array $data, PDO $pdo) {
+    $sql = "UPDATE client SET
+        company = NULL,
+        company_number = NULL,
+        company_vat = NULL
+    WHERE custom_2 = :uid";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':uid' => $data['uid']
+        ]);
+        if ($stmt->rowCount() > 0) {
+            echo " [✔] User {$data['uid']} unregistered from company {$data['company_id']}.\n";
+        } else {
+            echo " [!] No user found to unregister with UID: {$data['uid']}. Check if it exists.\n";
+        }
+    } catch (PDOException $e) {
+        echo " [!] Error: Database failed to unregister user {$data['uid']} from company {$data['company_id']}.\n" . $e->getMessage() . "\n";
+    }
+}
+
+
+// --- GENERAL FUNCTIONS ---
+function getCompany($data, $pdo) {
+    $sql = "SELECT * FROM company WHERE uid = :uid";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':uid' => $data['company_id']
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch company with UID: {$data['company_id']} " . $e->getMessage() . "\n";
+        return null;
+    }
+
+    $row = $stmt->fetch();
+
+    return ($row !== false) ? $row : null;
+}
+
+function unregisterAllUsersFromCompany($data, $pdo) {
+    $users = getAllUsersWithCompany($data, $pdo);
+    if (!$users) {
+        echo " [!] No users found for company {$data['name']}.\n";
+        return;
+    }
+    $company = [
+        'uid' => 0,
+        'company_id' => $data['uid']
+    ];
+    foreach ($users as $user) {
+        $company['uid'] = $user['custom_2'];
+        unregisterCompanyEmployee($company, $pdo);
+    }
+
+}
+
+function getAllUsersWithCompany($data, $pdo) {
+    $sql = "SELECT custom_2 FROM client WHERE 
+    company = :name AND
+    company_number = :company_number AND
+    company_vat = :vat_number";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':name' => trim($data['name']),
+            ':company_number' => $data['company_number'],
+            ':vat_number' => $data['vat_number'],
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch users with company {$data['name']} " . $e->getMessage() . "\n";
+        return null;
+    }
+
+    $rows = $stmt->fetchAll();
+
+    return (!empty($rows)) ? $rows : null;
 }
