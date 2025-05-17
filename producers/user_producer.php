@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../logger.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -81,6 +82,7 @@ while (true) {
 
                     if ($clientUpdate->rowCount() === 0) {
                         echo " [!] No rows affected. Update may have failed or was unnecessary.\n";
+                        sendLog($channel, "user", "No rows affected while updating UID for client #{$row['client_id']}. Possibly missing client.");
                     }
 
                 }  catch (PDOException $e) {
@@ -93,12 +95,13 @@ while (true) {
         }
     } catch (PDOException $e) {
         echo " [!] Database error: " . $e->getMessage() . "\n";
+        sendLog($channel, "user", "Database error while polling user_events: " . $e->getMessage());
     }
     sleep(INTERVAL);
 }
 
 // process user data 
-function processRow($userData, $operation, $channel) {  
+function processRow($userData, $operation, $channel) {
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
@@ -110,6 +113,7 @@ function processRow($userData, $operation, $channel) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Skipping...";
+            sendLog($channel, "user", "Unknown operation '{$operation}'");
             return;
             break;
     }
@@ -165,6 +169,7 @@ function publishMessage($xmlString, $channel, $operation) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Canceled message publishing.";
+            sendLog($channel, "billing", "Canceled publish due to unknown operation '{$operation}'");
             return;
             break;
     }

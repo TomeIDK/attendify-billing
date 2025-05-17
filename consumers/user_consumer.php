@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../logger.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -166,6 +167,7 @@ while ($channel->is_consuming()) {
  * Insert a new user into the users table.
  */
 function createUser(array $data, PDO $pdo) {
+    global $channel;
     $currentTime = date('Y-m-d H:i:s');
 
     // Set session variable to indicate consumer is making the change
@@ -190,11 +192,14 @@ function createUser(array $data, PDO $pdo) {
             ':updated_at'     => $currentTime,
         ]);
         echo " [✔] User created successfully: {$data['email']}\n";
+        sendLog($channel, "user", "User created successfully: {$data['custom_2']}");
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
             echo " [!] User with email {$data['email']} already exists. Skipping...\n";
+            sendLog($channel, "user", "User with email {$data['email']} already exists. Skipping...");
         } else {
             echo " [!] Error: Database failed to create user.\n" . $e->getMessage() . "\n";
+            sendLog($channel, "user", "Database failed to create user: " . $e->getMessage());
         }
     }
 }
@@ -203,6 +208,7 @@ function createUser(array $data, PDO $pdo) {
  * Update an existing user in the users table.
  */
 function updateUser(array $data, PDO $pdo) {
+    global $channel;
     $currentTime = date('Y-m-d H:i:s');
 
     // set session variable
@@ -231,12 +237,14 @@ function updateUser(array $data, PDO $pdo) {
         ]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] User updated with UID: {$data['uid']}\n";
+            sendLog($channel, "user", "User updated with UID: {$data['uid']}");
         } else {
             echo " [!] No user found to update with UID: {$data['uid']}. Check if it exists.\n";
-          
+            sendLog($channel, "user", "No user found to update with UID: {$data['uid']}.");
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
+        sendLog($channel, "user", "Database failed to update user: " . $e->getMessage());
     }
 }
 
@@ -244,6 +252,7 @@ function updateUser(array $data, PDO $pdo) {
  * Delete a user from the users table.
  */
 function deleteUser(array $data, PDO $pdo) {
+    global $channel;
 
     // set session variable
     $pdo->exec("SET @is_consumer_source = 1");
@@ -254,11 +263,14 @@ function deleteUser(array $data, PDO $pdo) {
         $stmt->execute([':custom_2' => $data['uid']]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] User successfully deleted with UID: {$data['uid']}\n";
+            sendLog($channel, "user", "User successfully deleted with UID: {$data['uid']}");
         } else {
             echo " [!] No user found with UID: {$data['uid']}.\n";
+            sendLog($channel, "user", "No user found with UID: {$data['uid']}.");
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
+        sendLog($channel, "user", "Database failed to delete user: " . $e->getMessage());
     }
 }
 
@@ -268,6 +280,7 @@ function deleteUser(array $data, PDO $pdo) {
  * Insert a new event into the events table.
  */
 function createEvent(array $e, PDO $pdo) {
+    global $channel;
     $sql = "INSERT INTO events
         (uid_event, name, start_date, end_date, address, description, max_attendees)
      VALUES
@@ -284,8 +297,10 @@ function createEvent(array $e, PDO $pdo) {
             ':max'   => (int) trim($e['max_attendees'] ?? 0),
         ]);
         echo " [✔] Event created: {$e['uid_event']}\n";
+        sendLog($channel, "event", "Event created: {$e['uid_event']}");
     } catch (PDOException $ex) {
         echo " [!] Failed to create event {$e['uid_event']}: " . $ex->getMessage() . "\n";
+        sendLog($channel, "event", "Failed to create event {$e['uid_event']}: " . $ex->getMessage());
     }
 }
 
@@ -293,6 +308,7 @@ function createEvent(array $e, PDO $pdo) {
  * Update an existing event in the events table.
  */
 function updateEvent(array $e, PDO $pdo) {
+    global $channel;
     $sql = "UPDATE events SET
                 name = :name,
                 start_date = :start,
@@ -314,8 +330,10 @@ function updateEvent(array $e, PDO $pdo) {
     ]);
     if ($stmt->rowCount() > 0) {
         echo " [✔] Event updated: {$e['uid_event']}\n";
+        sendLog($channel, "event", "Event updated: {$e['uid_event']}");
     } else {
         echo " [!] No event found to update: {$e['uid_event']}\n";
+        sendLog($channel, "event", "No event found to update: {$e['uid_event']}");
     }
 }
 
@@ -323,12 +341,15 @@ function updateEvent(array $e, PDO $pdo) {
  * Delete an event from the events table.
  */
 function deleteEvent(array $e, PDO $pdo) {
+    global $channel;
     $stmt = $pdo->prepare("DELETE FROM events WHERE uid_event = :uniqueid");
     $stmt->execute([':uniqueid' => $e['uid_event']]);
     if ($stmt->rowCount() > 0) {
         echo " [✔] Event deleted: {$e['uid_event']}\n";
+        sendLog($channel, "event", "Event deleted: {$e['uid_event']}");
     } else {
         echo " [!] No event found to delete: {$e['uid_event']}\n";
+        sendLog($channel, "event", "No event found to delete: {$e['uid_event']}");
     }
 }
 
