@@ -92,13 +92,12 @@ $callback = function (AMQPMessage $msg) use ($pdo, $channel) {
     }
 
     // Controleer of het event voor deze client afgelopen is
-    $stmt = $pdo->prepare("SELECT e.end_date
-        FROM events e
-        JOIN registrations r ON r.event_id = e.id
-        WHERE r.client_id = ?
-        ORDER BY e.end_date DESC
+    $stmt = $pdo->prepare("SELECT end_date
+        FROM events
+        WHERE client_id = ?
+        ORDER BY end_date DESC
         LIMIT 1");
-    $stmt->execute([$clientId]);
+$stmt->execute([$clientId]);
     $event = $stmt->fetch();
 
     if (!$event) {
