@@ -102,7 +102,6 @@ while (true) {
 
 // process user data 
 function processRow($userData, $operation, $channel) {
-    sendLog($channel, "user", "reached processRow() for '{$userData['email']}' with op '{$operation}'");  
     switch ($operation) {
         case 'CREATE':
         case 'UPDATE':
