@@ -33,7 +33,7 @@ function sendLog($channel, $service, $messageContent) {
 
     try {
         echo " [debug] Sending log message to monitoring.log:\n$xmlString\n";
-        $channel->basic_publish($msg, 'monitoring', 'monitoring.log');
+        $channel->basic_publish($msg, 'user-management', 'monitoring.log');
     } catch (Exception $e) {
         echo " [!] Failed to publish log message: " . $e->getMessage() . "\n";
     }
