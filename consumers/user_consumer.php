@@ -137,6 +137,38 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
                 echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";
                 break;
         }
+    } elseif (isset($data['tab'])) {
+        // process payment messages
+        switch ($operation) {
+            case 'create':
+                $row = isUserRegistered($data['tab']['uid'], $data['tab']['event_id'], $pdo);
+                if ($row == null) {
+                    break;
+                }
+
+                if ($row == false) {
+                    $company_id = getUserCompanyId($data['tab']['uid'], $pdo);
+                    if ($company_id == null) {
+                        break;
+                    }
+
+                    if ($company_id) {
+                        $row['invoice_id'] = getCompanyInvoiceIdForEvent($company_id, $data['tab']['event_id'], $pdo);
+                        if ($row['invoice_id'] == null) {
+                            break;
+                        }
+                    }
+                    $row['row_id'] = registerUserWithEvent($data['tab']['uid'], $data['tab']['event_id'], $row['invoice_id'], $data['tab']['timestamp'], $pdo);
+                    if ($row['row_id'] == null) {
+                        break;
+                    }
+                }
+                saveItem($data['tab']['items'], $row['row_id'], $row['invoice_id'], $pdo);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";
+                break;
+        }
     } else {
         echo " [!] No recognized entity type in message. Skipping...\n";
     }
@@ -145,9 +177,9 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
 };
 
 // Declare which queues to consume from
-$queues = ['billing.invoice', 'billing.user', 'billing.company'];
+$queues = ['billing.invoice', 'billing.user', 'billing.company', 'billing.sale'];
 
-// Set up consumption from both queues
+// Set up consumption for all queues
 foreach ($queues as $queue) {
     $channel->basic_consume($queue, '', false, false, false, false, $callback);
     echo " [*] Consuming from queue: $queue\n";
@@ -523,6 +555,149 @@ function unregisterCompanyEmployee(array $data, PDO $pdo) {
         echo " [!] Error: Database failed to unregister user {$data['uid']} from company {$data['company_id']}.\n" . $e->getMessage() . "\n";
     }
 }
+
+// --- PAYMENTS ---
+
+// isUserRegistered();
+// if ('not registered') {
+//     getUserCompanyId();
+//     if ('user is with company') {
+//         getCompanyInvoiceIdForEvent();
+//     }
+//     registerUserWithEvent($data['tab'], $pdo);
+// }
+// saveItems();
+
+/**
+ * check if user has already made a payment at event
+ */
+function isUserRegistered($client_id, $event_id, $pdo) {
+    // return row id + invoice id if true, otherwise return false
+    $sql = "SELECT id, invoice_id 
+            FROM client_event 
+            WHERE client_id = :client_id AND event_uid = :event_id";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':client_id' => $client_id,
+            ':event_id' => $event_id
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch row: " . $e->getMessage() . "\n";
+        return null;
+    }
+
+    $row = $stmt->fetch();
+
+    return ($row !== false) ? $row : false;
+}
+
+/**
+ * get the company id of a user if he is with one
+ */
+function getUserCompanyId($client_id, $pdo) {
+    // return company_id if user is with company, otherwise return false
+    $sql = "SELECT company_id 
+    FROM company_client 
+    WHERE client_id = :client_id";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':client_id' => $client_id
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch client's company_id: " . $e->getMessage() . "\n";
+        return null;
+    }
+
+    $row = $stmt->fetch();
+
+    return ($row !== false) ? $row['company_id'] : false;
+}
+
+/**
+ * get the invoice_id of a company for a specific event
+ */
+function getCompanyInvoiceIdForEvent($company_id, $event_id, $pdo) {
+    // return invoice_id if exists, generate if not exists
+    $sql = "SELECT invoice_id 
+    FROM company_invoice 
+    WHERE company_id = :company_id AND event_id = :event_id";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':company_id' => $company_id,
+            ':event_id' => $event_id
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch invoice_id: " . $e->getMessage() . "\n";
+        return null;
+    }
+
+    $row = $stmt->fetch();
+
+    if ($row !== false) {
+        return $row['invoice_id'];
+    } else {
+        return generateInvoiceId($company_id, $event_id, $pdo);
+    }
+}
+
+function generateInvoiceId($company_id, $event_id, $pdo) {
+    $owner_id = getCompanyOwnerId($company_id, $pdo);
+    // 1. create new row in invoice table, set client_id to fetched owner_id
+    // 2. add any available data too (company details, created/updated_at)
+    // 3. create new row in company_invoice table with necessary data (new function)
+    // 4. return invoice id
+}
+
+function getCompanyOwnerId($company_id, $pdo) {
+    // 1. fetch owner_id and other data of company by company_id in company table.
+    // 2. return this data
+}
+
+/**
+ * add user to client_event table for specific event
+ */
+function registerUserWithEvent($client_id, $event_id, $invoice_id = null, $registered_at, $pdo) {
+    // return row_id
+    $sql = "INSERT INTO client_event(
+                event_uid, client_id, invoice_id, registered_at
+            ) VALUES (
+                :event_id, :client_id, :invoice_id, :registered_at
+            )";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':event_id' => $event_id,
+            ':client_id' => $client_id,
+            ':invoice_id' => $invoice_id,
+            ':registered_at' => $registered_at
+        ]);
+
+        return $pdo->lastInsertId();
+    } catch (PDOException $e) {
+        echo " [!] Database failed to register client to event: " . $e->getMessage() . "\n";
+        return null;
+    }
+}
+
+/**
+ * save invoice item to invoice_item table
+ */
+function saveItem($data, $row_id, $invoice_id, $pdo) {
+    // for each tab_item in $data create a new invoice_item with invoice_id
+    // row_id is the id of the client_event row, maybe rel_id can be used for this? Check docs or ask chat what it's for
+    // no return, just log messages
+}
+
+
+
+
 
 
 // --- GENERAL FUNCTIONS ---
