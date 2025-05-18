@@ -693,6 +693,8 @@ function saveItem($data, $row_id, $invoice_id, $pdo) {
     // for each tab_item in $data create a new invoice_item with invoice_id
     // row_id is the id of the client_event row, maybe rel_id can be used for this? Check docs or ask chat what it's for
     // no return, just log messages
+
+    // If invoice_id is null, save item without an invoice_id (should happen automatically but check to make sure this happens)
 }
 
 
