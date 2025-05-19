@@ -647,16 +647,67 @@ function getCompanyInvoiceIdForEvent($company_id, $event_id, $pdo) {
 }
 
 function generateInvoiceId($company_id, $event_id, $pdo) {
-    $owner_id = getCompanyOwnerId($company_id, $pdo);
+    
+    $owner_id = getCompanyOwnerId($company_id, $pdo); // Calls the helper function to get the owner's ID
+    if ($owner_id === null) { // Checks if the owner was found
+        echo " [!] Could not generate invoice ID: Company owner not found for company_id {$company_id}\\n";
+        return null; // Returns null if owner not found
+    }
+
+    
+    $companyDetails = getCompany(['company_id' => $company_id], $pdo); // Fetches company details
+
     // 1. create new row in invoice table, set client_id to fetched owner_id
     // 2. add any available data too (company details, created/updated_at)
-    // 3. create new row in company_invoice table with necessary data (new function)
+    $currentTime = date('Y-m-d H:i:s');
+    $insertInvoiceSql = "INSERT INTO invoice (client_id, created_at, updated_at) VALUES (:client_id, :created_at, :updated_at)"; // SQL to insert into invoice
+    $stmtInvoice = $pdo->prepare($insertInvoiceSql);
+    try {
+        $stmtInvoice->execute([
+            ':client_id' => $owner_id, // Sets client_id to the owner_id
+            ':created_at' => $currentTime,
+            ':updated_at' => $currentTime
+        ]);
+        $invoiceId = $pdo->lastInsertId(); // Gets the ID of the new invoice
+        echo " [✔] Created new invoice #{$invoiceId} for company {$company_id}\\n";
+    } catch (PDOException $e) {
+        echo " [!] Database failed to create invoice: " . $e->getMessage() . "\\n";
+        return null;
+    }
+
+    // 3. create new row in company_invoice table with necessary data
+    $insertCompanyInvoiceSql = "INSERT INTO company_invoice (company_id, event_id, invoice_id) VALUES (:company_id, :event_id, :invoice_id)"; // SQL to link company, event, and invoice
+    $stmtCompanyInvoice = $pdo->prepare($insertCompanyInvoiceSql);
+    try {
+        $stmtCompanyInvoice->execute([
+            ':company_id' => $company_id,
+            ':event_id' => $event_id,
+            ':invoice_id' => $invoiceId // Links using the new invoice ID
+        ]);
+        echo " [✔] Linked invoice #{$invoiceId} to company {$company_id} and event {$event_id}\\n";
+    } catch (PDOException $e) {
+        echo " [!] Database failed to link invoice to company/event: " . $e->getMessage() . "\\n";
+        // Consider rolling back the invoice creation here if the link fails
+        return null;
+    }
+
     // 4. return invoice id
+    return $invoiceId; // Returns the generated invoice ID
 }
 
 function getCompanyOwnerId($company_id, $pdo) {
     // 1. fetch owner_id and other data of company by company_id in company table.
     // 2. return this data
+    $sql = "SELECT owner_id FROM company WHERE uid = :company_id"; // Fetches the owner_id
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([':company_id' => $company_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC); // Fetches the data (specifically the owner_id column)
+        return $row ? $row['owner_id'] : null; // Returns the owner_id, or null if not found
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch company owner ID: " . $e->getMessage() . "\\n";
+        return null;
+    }
 }
 
 /**
@@ -695,6 +746,35 @@ function saveItem($data, $row_id, $invoice_id, $pdo) {
     // no return, just log messages
 
     // If invoice_id is null, save item without an invoice_id (should happen automatically but check to make sure this happens)
+
+    if (empty($data) || !is_array($data)) {
+        echo " [!] No items data provided to saveItem. Skipping.\n";
+        return;
+    }
+
+    $insertItemSql = "INSERT INTO invoice_item (invoice_id, title, quantity, price, taxed) VALUES (:invoice_id, :title, :quantity, :price, :taxed)";
+    $stmtItem = $pdo->prepare($insertItemSql);
+
+    foreach ($data as $item) {
+        // Ensure item data has expected keys
+        if (!isset($item['title'], $item['quantity'], $item['price'], $item['taxed'])) {
+            echo " [!] Skipping item due to missing data.\n";
+            continue; // Skip to the next item
+        }
+
+        try {
+            $stmtItem->execute([
+                ':invoice_id' => $invoice_id, 
+                ':title'      => $item['title'],
+                ':quantity'   => $item['quantity'],
+                ':price'      => $item['price'],
+                ':taxed'      => $item['taxed'],
+            ]);
+            echo " [✔] Saved item '{$item['title']}' to invoice_item table (Invoice ID: " . ($invoice_id ?? 'NULL') . ")\n";
+        } catch (PDOException $e) {
+            echo " [!] Error: Database failed to save item: " . $e->getMessage() . "\n";
+        }
+    }
 }
 
 
