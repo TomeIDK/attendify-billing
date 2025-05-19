@@ -424,6 +424,16 @@ function createCompany(array $data, PDO $pdo) {
             echo " [!] Error: Database failed to create company.\n" . $e->getMessage() . "\n";
         }
     }
+
+    $employeeData = [
+        'uid' => $data['owner_id'],
+        'company_id' => $data['uid'],
+        'name' => $data['name'],
+        'company_number' => $data['company_number'],
+        'vat_number' => $data['vat_number']
+    ];
+
+    registerCompanyEmployee($employeeData, $pdo);
 }
 
 /**
@@ -509,11 +519,11 @@ function deleteCompany(array $data, PDO $pdo) {
  * register a user with a company.
  */
 function registerCompanyEmployee(array $data, PDO $pdo) {
-        $sql = "UPDATE client SET
-            company = :name,
-            company_number = :company_number,
-            company_vat = :vat_number
-        WHERE custom_2 = :uid";
+    $sql = "UPDATE client SET
+                company = :name,
+                company_number = :company_number,
+                company_vat = :vat_number
+            WHERE custom_2 = :uid";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
@@ -529,6 +539,53 @@ function registerCompanyEmployee(array $data, PDO $pdo) {
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to register user {$data['uid']} with company {$data['company_id']}.\n" . $e->getMessage() . "\n";
+    }
+
+
+    // check if user is already registered with a company. update company id if true, insert user with company id if false
+    $isUserRegisteredWithCompany = isUserRegisteredWithACompany($data['uid'], $pdo);
+    if ($isUserRegisteredWithCompany == null) {
+        return;
+    }
+
+    if ($isUserRegisteredWithCompany) {
+        $sql = "UPDATE company_client SET
+                    company_id = :company_id
+                WHERE client_id = :client_id";
+        $stmt = $pdo->prepare($sql);
+        try {
+            $stmt->execute([
+                ':company_id' => $data['company_id'],
+                ':client_id' => $data['uid']
+            ]);
+
+            if ($stmt->rowCount() > 0) {
+                echo " [✔] User {$data['uid']} company updated to company {$data['company_id']}.\n";
+            }
+        } catch (PDOException $e) {
+            echo " [!] Error: Database failed to update user {$data['uid']} with company {$data['company_id']}.\n" . $e->getMessage() . "\n";
+        }
+    } else {
+        $sql = "INSERT INTO company_client (
+                    company_id, 
+                    client_id) VALUES (
+                    :company_id, :client_id
+                )";
+        $stmt = $pdo->prepare($sql);
+        try {
+            $stmt->execute([
+                ':company_id' => $data['company_id'],
+                ':client_id' => $data['uid'],
+            ]);
+
+            if ($stmt->rowCount() > 0) {
+                echo " [✔] User {$data['uid']} registered with company {$data['company_id']}.\n";
+            } else {
+                echo " [!] No user found to register with UID: {$data['uid']}. Check if it exists.\n";
+            }
+        } catch (PDOException $e) {
+        echo " [!] Error: Database failed to register user {$data['uid']} with company {$data['company_id']}.\n" . $e->getMessage() . "\n";
+        }
     }
 }
 
@@ -554,20 +611,26 @@ function unregisterCompanyEmployee(array $data, PDO $pdo) {
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to unregister user {$data['uid']} from company {$data['company_id']}.\n" . $e->getMessage() . "\n";
     }
+
+
+    $sql = "DELETE FROM company_client WHERE client_id = :client_id";
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':client_id' => $data['uid']
+        ]);
+
+        if ($stmt->rowCount() > 0) {
+            echo " [✔] User {$data['uid']} removed from company_client table.\n";
+        } else {
+            echo " [!] No record found with User ID: {$data['uid']}.\n";
+        }
+    } catch (PDOException $e) {
+        echo " [!] Error: Failed to remove User {$data['uid']} from company_client table.\n" . $e->getMessage() . "\n";
+    }
 }
 
 // --- PAYMENTS ---
-
-// isUserRegistered();
-// if ('not registered') {
-//     getUserCompanyId();
-//     if ('user is with company') {
-//         getCompanyInvoiceIdForEvent();
-//     }
-//     registerUserWithEvent($data['tab'], $pdo);
-// }
-// saveItems();
-
 /**
  * check if user has already made a payment at event
  */
@@ -839,4 +902,23 @@ function getAllUsersWithCompany($data, $pdo) {
     $rows = $stmt->fetchAll();
 
     return (!empty($rows)) ? $rows : null;
+}
+
+function isUserRegisteredWithACompany($client_id, $pdo) {
+    $sql = "SELECT * FROM company_client WHERE 
+    client_id = :client_id";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':client_id' => $client_id
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch user {$client_id} from company_client table" . $e->getMessage() . "\n";
+        return null;
+    }
+
+    $row = $stmt->fetch();
+
+    return ($row !== true);
 }
