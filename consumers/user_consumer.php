@@ -715,10 +715,10 @@ function getCompanyInvoiceIdForEvent($company_id, $event_id, $pdo) {
 
 function generateInvoiceId($company_id, $event_id, $pdo) {
     
-    $owner_id = getCompanyOwnerId($company_id, $pdo); // Calls the helper function to get the owner's ID
-    if ($owner_id === null) { // Checks if the owner was found
+    $owner_id = getCompanyOwnerId($company_id, $pdo); 
+    if ($owner_id === null) { 
         echo " [!] Could not generate invoice ID: Company owner not found for company_id {$company_id}\\n";
-        return null; // Returns null if owner not found
+        return null; 
     }
 
     
@@ -731,11 +731,11 @@ function generateInvoiceId($company_id, $event_id, $pdo) {
     $stmtInvoice = $pdo->prepare($insertInvoiceSql);
     try {
         $stmtInvoice->execute([
-            ':client_id' => $owner_id, // Sets client_id to the owner_id
+            ':client_id' => $owner_id, 
             ':created_at' => $currentTime,
             ':updated_at' => $currentTime
         ]);
-        $invoiceId = $pdo->lastInsertId(); // Gets the ID of the new invoice
+        $invoiceId = $pdo->lastInsertId(); 
         echo " [✔] Created new invoice #{$invoiceId} for company {$company_id}\\n";
     } catch (PDOException $e) {
         echo " [!] Database failed to create invoice: " . $e->getMessage() . "\\n";
@@ -749,17 +749,17 @@ function generateInvoiceId($company_id, $event_id, $pdo) {
         $stmtCompanyInvoice->execute([
             ':company_id' => $company_id,
             ':event_id' => $event_id,
-            ':invoice_id' => $invoiceId // Links using the new invoice ID
+            ':invoice_id' => $invoiceId 
         ]);
         echo " [✔] Linked invoice #{$invoiceId} to company {$company_id} and event {$event_id}\\n";
     } catch (PDOException $e) {
         echo " [!] Database failed to link invoice to company/event: " . $e->getMessage() . "\\n";
-        // Consider rolling back the invoice creation here if the link fails
+        
         return null;
     }
 
     // 4. return invoice id
-    return $invoiceId; // Returns the generated invoice ID
+    return $invoiceId; 
 }
 
 function getCompanyOwnerId($company_id, $pdo) {
@@ -823,10 +823,10 @@ function saveItem($data, $row_id, $invoice_id, $pdo) {
     $stmtItem = $pdo->prepare($insertItemSql);
 
     foreach ($data as $item) {
-        // Ensure item data has expected keys
+        
         if (!isset($item['title'], $item['quantity'], $item['price'], $item['taxed'])) {
             echo " [!] Skipping item due to missing data.\n";
-            continue; // Skip to the next item
+            continue; 
         }
 
         try {
