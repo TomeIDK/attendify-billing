@@ -8,14 +8,14 @@ composer.phar
 volumes
 
 /consumers/logs
-
+/tests/vendor
+/tests/composer.lock
 # Composer lock files (optional, but recommended to commit for applications)
 # /composer.lock
 # /consumers/composer.lock
 # /producers/composer.lock
 # /docker/composer.lock
-Test/UnitTest/vendor
-Test/UnitTest/composer.lock
+
 # Environment files (if you add them later)
 .env
 .env.local

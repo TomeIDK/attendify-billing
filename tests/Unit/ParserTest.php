@@ -1,9 +1,5 @@
 <?php
 
-// Update this path to point to the correct location of your parser.php file
-require_once __DIR__ . '/../../parser.php';
-require __DIR__ . '/vendor/autoload.php';
-
 use PHPUnit\Framework\TestCase;
 
 class ParserTest extends TestCase

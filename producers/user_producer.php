@@ -52,6 +52,14 @@ while (true) {
 
         // process each row individually and publish a message
         while ($row = $statement->fetch()) {
+            $isTestUser = isset($row['uid']) && strpos($row['uid'], 'TST') === 0;
+            if ($isTestUser) {
+                echo " [!] Skipping test user with UID: " . ($row['uid'] ?? '') . "\n";
+                markAsProcessed($row['id'], $pdo); // Mark as processed so it doesn't get stuck
+                continue;
+            }
+
+            
             echo " [*] Currently processing user #{$row['client_id']}: {$row['first_name']} {$row['last_name']} for {$row['operation']} operation.\n";
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
