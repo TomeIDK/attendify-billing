@@ -1,10 +1,10 @@
 -- create company table
 CREATE TABLE company (
-    uid BIGINT UNSIGNED PRIMARY KEY,
-    owner_id BIGINT NOT NULL,
+    uid VARCHAR(255) PRIMARY KEY,
+    owner_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    company_number VARCHAR(255) NOT NULL,
-    vat_number VARCHAR(255) NOT NULL,
+    companyNumber VARCHAR(255) NOT NULL,
+    VATNumber VARCHAR(255) NOT NULL,
     address_street VARCHAR(255) NOT NULL,
     address_number VARCHAR(255) NOT NULL,
     address_postcode VARCHAR(255) NOT NULL,
