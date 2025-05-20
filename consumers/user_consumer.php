@@ -145,7 +145,7 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
 };
 
 // Declare which queues to consume from
-$queues = ['billing.event', 'billing.user', 'billing.company', 'billing.sale'];
+$queues = ['billing.invoice', 'billing.user', 'billing.sale']; // 'billing.company',
 
 // Set up consumption from both queues
 foreach ($queues as $queue) {
