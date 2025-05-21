@@ -48,6 +48,9 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         $jsonData = xmlToJson($msg->getBody());
         $data = json_decode($jsonData, true)['attendify'];
         echo " [x] Parsed data.\n";
+        echo " [debug] Decoded data:\n";
+        print_r($data);
+
     } catch (Exception $e) {
         echo " [!] Error parsing XML: " . $e->getMessage() . "\n";
         return;
@@ -192,14 +195,14 @@ function createUser(array $data, PDO $pdo) {
             ':updated_at'     => $currentTime,
         ]);
         echo " [✔] User created successfully: {$data['email']}\n";
-        sendLog($channel, "user", "User created successfully: {$data['uid']}");
+        sendLog($channel, "user", "User created successfully: {$data['uid']}", 'user-management');
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
             echo " [!] User with email {$data['email']} already exists. Skipping...\n";
-            sendLog($channel, "user", "User with email {$data['email']} already exists. Skipping...");
+            sendLog($channel, "user", "User with email {$data['email']} already exists. Skipping...", 'user-management');
         } else {
             echo " [!] Error: Database failed to create user.\n" . $e->getMessage() . "\n";
-            sendLog($channel, "user", "Database failed to create user: " . $e->getMessage());
+            sendLog($channel, "user", "Database failed to create user: " . $e->getMessage(), 'user-management');
         }
     }
 }
@@ -237,14 +240,14 @@ function updateUser(array $data, PDO $pdo) {
         ]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] User updated with UID: {$data['uid']}\n";
-            sendLog($channel, "user", "User updated with UID: {$data['uid']}");
+            sendLog($channel, "user", "User updated with UID: {$data['uid']}", 'user-management');
         } else {
             echo " [!] No user found to update with UID: {$data['uid']}. Check if it exists.\n";
-            sendLog($channel, "user", "No user found to update with UID: {$data['uid']}.");
+            sendLog($channel, "user", "No user found to update with UID: {$data['uid']}.", 'user-management');
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
-        sendLog($channel, "user", "Database failed to update user: " . $e->getMessage());
+        sendLog($channel, "user", "Database failed to update user: " . $e->getMessage(), 'user-management');
     }
 }
 
@@ -263,14 +266,14 @@ function deleteUser(array $data, PDO $pdo) {
         $stmt->execute([':custom_2' => $data['uid']]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] User successfully deleted with UID: {$data['uid']}\n";
-            sendLog($channel, "user", "User successfully deleted with UID: {$data['uid']}");
+            sendLog($channel, "user", "User successfully deleted with UID: {$data['uid']}", 'user-management');
         } else {
             echo " [!] No user found with UID: {$data['uid']}.\n";
-            sendLog($channel, "user", "No user found with UID: {$data['uid']}.");
+            sendLog($channel, "user", "No user found with UID: {$data['uid']}.", 'user-management');
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
-        sendLog($channel, "user", "Database failed to delete user: " . $e->getMessage());
+        sendLog($channel, "user", "Database failed to delete user: " . $e->getMessage(), 'user-management');
     }
 }
 
@@ -297,10 +300,10 @@ function createEvent(array $e, PDO $pdo) {
             ':max'   => (int) trim($e['max_attendees'] ?? 0),
         ]);
         echo " [✔] Event created: {$e['uid']}\n";
-        sendLog($channel, "event", "Event created: {$e['uid']}");
+        sendLog($channel, "event", "Event created: {$e['uid']}", "event");
     } catch (PDOException $ex) {
         echo " [!] Failed to create event {$e['uid']}: " . $ex->getMessage() . "\n";
-        sendLog($channel, "event", "Failed to create event {$e['uid']}: " . $ex->getMessage());
+        sendLog($channel, "event", "Failed to create event {$e['uid']}: " . $ex->getMessage(), "event");
     }
 }
 
@@ -330,10 +333,10 @@ function updateEvent(array $e, PDO $pdo) {
     ]);
     if ($stmt->rowCount() > 0) {
         echo " [✔] Event updated: {$e['uid']}\n";
-        sendLog($channel, "event", "Event updated: {$e['uid']}");
+        sendLog($channel, "event", "Event updated: {$e['uid']}", "event");
     } else {
         echo " [!] No event found to update: {$e['uid']}\n";
-        sendLog($channel, "event", "No event found to update: {$e['uid']}");
+        sendLog($channel, "event", "No event found to update: {$e['uid']}", "event");
     }
 }
 
@@ -346,10 +349,10 @@ function deleteEvent(array $e, PDO $pdo) {
     $stmt->execute([':uniqueid' => $e['uid']]);
     if ($stmt->rowCount() > 0) {
         echo " [✔] Event deleted: {$e['uid']}\n";
-        sendLog($channel, "event", "Event deleted: {$e['uid']}");
+        sendLog($channel, "event", "Event deleted: {$e['uid']}", "event");
     } else {
         echo " [!] No event found to delete: {$e['uid']}\n";
-        sendLog($channel, "event", "No event found to delete: {$e['uid']}");
+        sendLog($channel, "event", "No event found to delete: {$e['uid']}", "event");
     }
 }
 
@@ -360,6 +363,7 @@ function deleteEvent(array $e, PDO $pdo) {
  * insert a new company into the company table.
  */
 function createCompany(array $data, PDO $pdo) {
+    global $channel;
     $sql = "INSERT INTO company (
                 uid, owner_id, name, companyNumber, VATNumber, address_street, address_number, address_postcode, address_city, billing_address_street, billing_address_number, billing_address_postcode, billing_address_city, email, phone
             ) VALUES (
@@ -385,11 +389,14 @@ function createCompany(array $data, PDO $pdo) {
             ':phone' => $data['phone']
         ]);
         echo " [✔] Company {$data['name']} created successfully: {$data['uid']}\n";
+        sendLog($channel, "company", "Company {$data['name']} created successfully: {$data['uid']}", 'company');
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
             echo " [!] Company with UID {$data['uid']} already exists. Skipping...\n";
+            sendLog($channel, "company", "Company with UID {$data['uid']} already exists. Skipping...", 'company');
         } else {
             echo " [!] Error: Database failed to create company.\n" . $e->getMessage() . "\n";
+            sendLog($channel, "company", "Database failed to create company: " . $e->getMessage(), 'company');
         }
     }
 
@@ -406,6 +413,7 @@ function createCompany(array $data, PDO $pdo) {
  * Update an existing user in the users table.
  */
 function updateCompany(array $data, PDO $pdo) {
+    global $channel;
     $sql = "UPDATE company SET
                 owner_id = :owner_id,
                 name = :name,
@@ -443,12 +451,14 @@ function updateCompany(array $data, PDO $pdo) {
         ]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] Company updated with UID: {$data['uid']}\n";
+            sendLog($channel, "company", "Company updated with UID: {$data['uid']}", 'company');
         } else {
             echo " [!] No company found to update with UID: {$data['uid']}. Check if it exists.\n";
-          
+            sendLog($channel, "company", "No company found to update with UID: {$data['uid']}.", 'company');
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update company.\n" . $e->getMessage() . "\n";
+        sendLog($channel, "company", "Database failed to update company: " . $e->getMessage(), 'company');
     }
 
     // set uid to owner_id for compatibility with registerCompanyEmployee()
@@ -464,6 +474,7 @@ function updateCompany(array $data, PDO $pdo) {
  * Delete a user from the users table.
  */
 function deleteCompany(array $data, PDO $pdo) {
+    global $channel;
     $sql = "DELETE FROM company WHERE uid = :uid";
     $stmt = $pdo->prepare($sql);
     try {
@@ -485,6 +496,8 @@ function deleteCompany(array $data, PDO $pdo) {
  * register a user with a company.
  */
 function registerCompanyEmployee(array $data, PDO $pdo) {
+    global $channel;
+  
     // set session variable
     $pdo->exec("SET @is_consumer_source = 1");
 
@@ -503,11 +516,14 @@ function registerCompanyEmployee(array $data, PDO $pdo) {
         ]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] User {$data['uid']} registered with company {$data['name']}.\n";
+            sendLog($channel, "company", "User {$data['uid']} registered with company {$data['name']}.", 'company-management');
         } else {
-            echo " [!] No user found to register with UID: {$data['uid']}. Check if it exists or if he already belongs to the company.\n";
+            echo " [!] No user found to register with UID: {$data['uid']}. Check if it exists.\n";
+            sendLog($channel, "company", "No user found to register with UID: {$data['uid']}.", 'company-management');
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to register user {$data['uid']} with company {$data['name']}.\n" . $e->getMessage() . "\n";
+        sendLog($channel, "company", "Database failed to register user {$data['uid']} with company {$data['name']}: " . $e->getMessage(), 'company-management');
     }
 }
 
@@ -515,6 +531,8 @@ function registerCompanyEmployee(array $data, PDO $pdo) {
  * unregister a user with a company.
  */
 function unregisterCompanyEmployee(array $data, PDO $pdo) {
+    global $channel;
+  
     // set session variable
     $pdo->exec("SET @is_consumer_source = 1");
     
@@ -530,17 +548,21 @@ function unregisterCompanyEmployee(array $data, PDO $pdo) {
         ]);
         if ($stmt->rowCount() > 0) {
             echo " [✔] User {$data['uid']} unregistered from company {$data['company_id']}.\n";
+            sendLog($channel, "company", "User {$data['uid']} unregistered from company {$data['company_id']}.", 'company-management');
         } else {
             echo " [!] No user found to unregister with UID: {$data['uid']}. Check if it exists.\n";
+            sendLog($channel, "company", "No user found to unregister with UID: {$data['uid']}.", 'company-management');
         }
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to unregister user {$data['uid']} from company {$data['company_id']}.\n" . $e->getMessage() . "\n";
+        sendLog($channel, "company", "Database failed to unregister user {$data['uid']} from company {$data['company_id']}: " . $e->getMessage(), 'company-management');
     }
 }
 
 
 // --- GENERAL FUNCTIONS ---
 function getCompany($data, $pdo) {
+    global $channel;
     $sql = "SELECT * FROM company WHERE uid = :uid";
 
     $stmt = $pdo->prepare($sql);
@@ -550,6 +572,7 @@ function getCompany($data, $pdo) {
         ]);
     } catch (PDOException $e) {
         echo " [!] Database failed to fetch company with UID: {$data['company_id']} " . $e->getMessage() . "\n";
+        sendLog($channel, "company", "Database failed to fetch company with UID: {$data['company_id']}: " . $e->getMessage(), 'company');
         return null;
     }
 
@@ -559,9 +582,11 @@ function getCompany($data, $pdo) {
 }
 
 function unregisterAllUsersFromCompany($data, $pdo) {
+    global $channel;
     $users = getAllUsersWithCompany($data, $pdo);
     if (!$users) {
         echo " [!] No users found for company {$data['name']}.\n";
+        sendLog($channel, "company", "No users found for company {$data['name']}.", 'company');
         return;
     }
     $company = [
@@ -576,6 +601,7 @@ function unregisterAllUsersFromCompany($data, $pdo) {
 }
 
 function getAllUsersWithCompany($data, $pdo) {
+    global $channel;
     $sql = "SELECT custom_2 FROM client WHERE 
     company = :name AND
     company_number = :companyNumber AND
@@ -590,6 +616,7 @@ function getAllUsersWithCompany($data, $pdo) {
         ]);
     } catch (PDOException $e) {
         echo " [!] Database failed to fetch users with company {$data['name']} " . $e->getMessage() . "\n";
+        sendLog($channel, "company", "Database failed to fetch users with company {$data['name']}: " . $e->getMessage(), 'company');
         return null;
     }
 

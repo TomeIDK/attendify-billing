@@ -82,7 +82,7 @@ while (true) {
 
                     if ($clientUpdate->rowCount() === 0) {
                         echo " [!] No rows affected. Update may have failed or was unnecessary.\n";
-                        sendLog($channel, "user", "No rows affected while updating UID for client #{$row['client_id']}. Possibly missing client.");
+                        sendLog($channel, "user", "No rows affected while updating UID for client #{$row['client_id']}. Possibly missing client.", 'user-management');
                     }
 
                 }  catch (PDOException $e) {
@@ -95,7 +95,7 @@ while (true) {
         }
     } catch (PDOException $e) {
         echo " [!] Database error: " . $e->getMessage() . "\n";
-        sendLog($channel, "user", "Database error while polling user_events: " . $e->getMessage());
+        sendLog($channel, "user", "Database error while polling user_events: " . $e->getMessage(), 'user-management');
     }
     sleep(INTERVAL);
 }
@@ -113,7 +113,7 @@ function processRow($userData, $operation, $channel) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Skipping...";
-            sendLog($channel, "user", "Unknown operation '{$operation}'");
+            sendLog($channel, "user", "Unknown operation '{$operation}'", 'user-management');
             return;
             break;
     }
@@ -169,7 +169,7 @@ function publishMessage($xmlString, $channel, $operation) {
             break;
         default:
             echo " [!] Error: Unknown operation '{$operation}'. Canceled message publishing.";
-            sendLog($channel, "billing", "Canceled publish due to unknown operation '{$operation}'");
+            sendLog($channel, "billing", "Canceled publish due to unknown operation '{$operation}'", 'user-management');
             return;
             break;
     }
