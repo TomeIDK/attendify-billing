@@ -734,37 +734,46 @@ function getCompanyInvoiceIdForEvent($company_id, $event_id, $pdo) {
     }
 }
 
-function generateInvoiceId($company_id, $event_id, $pdo) {
-    
-    $owner_id = getCompanyOwnerId($company_id, $pdo); 
-    if ($owner_id === null) { 
-        echo " [!] Could not generate invoice ID: Company owner not found for company_id {$company_id}\\n";
-        return null; 
-    }
-
-    
-    $companyDetails = getCompany(['company_id' => $company_id], $pdo); // Fetches company details
-
-    // 1. create new row in invoice table, set client_id to fetched owner_id
-    // 2. add any available data too (company details, created/updated_at)
+function createInvoice($client_id, $pdo) {
     $currentTime = date('Y-m-d H:i:s');
     $insertInvoiceSql = "INSERT INTO invoice (client_id, created_at, updated_at) VALUES (:client_id, :created_at, :updated_at)"; // SQL to insert into invoice
     $stmtInvoice = $pdo->prepare($insertInvoiceSql);
     try {
         $stmtInvoice->execute([
-            ':client_id' => $owner_id, 
+            ':client_id' => $client_id, 
             ':created_at' => $currentTime,
             ':updated_at' => $currentTime
         ]);
         $invoiceId = $pdo->lastInsertId(); 
-        echo " [✔] Created new invoice #{$invoiceId} for company {$company_id}\\n";
+        echo " [✔] Created new invoice #{$invoiceId}\n";
+        return $invoiceId;
     } catch (PDOException $e) {
-        echo " [!] Database failed to create invoice: " . $e->getMessage() . "\\n";
+        echo " [!] Database failed to create invoice: " . $e->getMessage() . "\n";
+        return null;
+    }
+}
+
+function generateInvoiceId($company_id, $event_id, $pdo) {
+    $owner_id = getCompanyOwnerId($company_id, $pdo); 
+    if ($owner_id === null) { 
+        echo " [!] Could not generate invoice ID: Company owner not found for company_id {$company_id}\n";
+        return null; 
+    }
+
+    $companyDetails = getCompany(['company_id' => $company_id], $pdo);
+    if ($companyDetails === null) {
+        echo " [!] Could not generate invoice ID: Company details not found for company_id {$company_id}\n";
         return null;
     }
 
-    // 3. create new row in company_invoice table with necessary data
-    $insertCompanyInvoiceSql = "INSERT INTO company_invoice (company_id, event_id, invoice_id) VALUES (:company_id, :event_id, :invoice_id)"; // SQL to link company, event, and invoice
+    // Create new invoice
+    $invoiceId = createInvoice($owner_id, $pdo);
+    if ($invoiceId === null) {
+        return null;
+    }
+
+    // Link invoice to company and event
+    $insertCompanyInvoiceSql = "INSERT INTO company_invoice (company_id, event_id, invoice_id) VALUES (:company_id, :event_id, :invoice_id)";
     $stmtCompanyInvoice = $pdo->prepare($insertCompanyInvoiceSql);
     try {
         $stmtCompanyInvoice->execute([
@@ -851,12 +860,17 @@ function saveItem($data, $row_id, $invoice_id, $pdo) {
         }
 
         try {
+            // Calculate BTW amount based on taxed status
+            //$isTaxed = $item['taxed'] ?? false;
+            //$btwAmount = $isTaxed ? ($item['price'] * $item['quantity'] * 0.21) : 0;
+            //$totalWithBTW = ($item['price'] * $item['quantity']) + $btwAmount;
+
             $stmtItem->execute([
-                ':invoice_id' => $invoice_id, 
-                ':title'      => $item['title'],
-                ':quantity'   => $item['quantity'],
-                ':price'      => $item['price'],
-                ':taxed'      => $item['taxed'],
+                ':invoice_id' => $invoice_id,
+                ':title' => $item['title'],
+                ':quantity' => $item['quantity'],
+                ':price' => $item['price'],
+                ':taxed' => $item['taxed'] ?? false
             ]);
             echo " [✔] Saved item '{$item['title']}' to invoice_item table (Invoice ID: " . ($invoice_id ?? 'NULL') . ")\n";
         } catch (PDOException $e) {
