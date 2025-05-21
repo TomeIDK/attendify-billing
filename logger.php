@@ -10,7 +10,7 @@ use PhpAmqpLib\Message\AMQPMessage;
  * @param string $service  e.g. 'user', 'invoice'
  * @param string $messageContent  The log message text
  */
-function sendLog($channel, $service, $messageContent) {
+function sendLog($channel, $service, $messageContent, $exchange) {
     $timestamp = round(microtime(true) * 1000);
 
     $logData = [
@@ -33,7 +33,7 @@ function sendLog($channel, $service, $messageContent) {
 
     try {
         echo " [debug] Sending log message to monitoring.log:\n$xmlString\n";
-        $channel->basic_publish($msg, 'user-management', 'monitoring.log');
+        $channel->basic_publish($msg, $exchange, 'monitoring.log');
     } catch (Exception $e) {
         echo " [!] Failed to publish log message: " . $e->getMessage() . "\n";
     }
