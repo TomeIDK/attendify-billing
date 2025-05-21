@@ -104,14 +104,14 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         // Process company operations
         switch ($operation) {
             case 'create':
-                createCompany($data['companies'], $pdo);
+                createCompany($data['companies']['company'], $pdo);
                 break;
             case 'update':
-                updateCompany($data['companies'], $pdo);
+                updateCompany($data['companies']['company'], $pdo);
                 break;
             case 'delete':
-                deleteCompany($data['companies'], $pdo);
-                unregisterAllUsersFromCompany($data['companies'], $pdo);
+                deleteCompany($data['companies']['company'], $pdo);
+                unregisterAllUsersFromCompany($data['companies']['company'], $pdo);
                 break;
             default:
                 echo " [!] Unknown operation '{$operation}' for event. Skipping...\n";
@@ -128,8 +128,8 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
                 }
 
                 $data['company_employee']['name'] = $companyData['name'];
-                $data['company_employee']['company_number'] = $companyData['company_number'];
-                $data['company_employee']['vat_number'] = $companyData['vat_number'];
+                $data['company_employee']['companyNumber'] = $companyData['companyNumber'];
+                $data['company_employee']['VATNumber'] = $companyData['VATNumber'];
 
                 registerCompanyEmployee($data['company_employee'], $pdo);
                 break;
@@ -148,7 +148,7 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
 };
 
 // Declare which queues to consume from
-$queues = ['billing.invoice', 'billing.user', 'billing.company'];
+$queues = ['billing.event', 'billing.user', 'billing.company', 'billing.sale'];
 
 // Set up consumption from both queues
 foreach ($queues as $queue) {
@@ -195,7 +195,7 @@ function createUser(array $data, PDO $pdo) {
             ':updated_at'     => $currentTime,
         ]);
         echo " [✔] User created successfully: {$data['email']}\n";
-        sendLog($channel, "user", "User created successfully: {$data['custom_2']}", 'user-management');
+        sendLog($channel, "user", "User created successfully: {$data['uid']}", 'user-management');
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
             echo " [!] User with email {$data['email']} already exists. Skipping...\n";
@@ -291,19 +291,19 @@ function createEvent(array $e, PDO $pdo) {
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
-            ':uniqueid'   => $e['uid_event'],
-            ':name'  => $e['name'],
+            ':uniqueid'   => $e['uid'],
+            ':name'  => $e['title'],
             ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
             ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
-            ':addr'  => $e['address'],
+            ':addr'  => $e['location'],
             ':desc'  => $e['description'] ?? null,
             ':max'   => (int) trim($e['max_attendees'] ?? 0),
         ]);
-        echo " [✔] Event created: {$e['uid_event']}\n";
-        sendLog($channel, "event", "Event created: {$e['uid_event']}", "event");
+        echo " [✔] Event created: {$e['uid']}\n";
+        sendLog($channel, "event", "Event created: {$e['uid']}", "event");
     } catch (PDOException $ex) {
-        echo " [!] Failed to create event {$e['uid_event']}: " . $ex->getMessage() . "\n";
-        sendLog($channel, "event", "Failed to create event {$e['uid_event']}: " . $ex->getMessage(), "event");
+        echo " [!] Failed to create event {$e['uid']}: " . $ex->getMessage() . "\n";
+        sendLog($channel, "event", "Failed to create event {$e['uid']}: " . $ex->getMessage(), "event");
     }
 }
 
@@ -323,20 +323,20 @@ function updateEvent(array $e, PDO $pdo) {
             WHERE uid_event = :uniqueid";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        ':uniqueid'   => $e['uid_event'],
-        ':name'  => $e['name'],
+        ':uniqueid'   => $e['uid'],
+        ':name'  => $e['title'],
         ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
         ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
-        ':addr'  => $e['address'],
+        ':addr'  => $e['location'],
         ':desc'  => $e['description'] ?? null,
         ':max'   => (int) trim($e['max_attendees'] ?? 0),
     ]);
     if ($stmt->rowCount() > 0) {
-        echo " [✔] Event updated: {$e['uid_event']}\n";
-        sendLog($channel, "event", "Event updated: {$e['uid_event']}", "event");
+        echo " [✔] Event updated: {$e['uid']}\n";
+        sendLog($channel, "event", "Event updated: {$e['uid']}", "event");
     } else {
-        echo " [!] No event found to update: {$e['uid_event']}\n";
-        sendLog($channel, "event", "No event found to update: {$e['uid_event']}", "event");
+        echo " [!] No event found to update: {$e['uid']}\n";
+        sendLog($channel, "event", "No event found to update: {$e['uid']}", "event");
     }
 }
 
@@ -346,13 +346,13 @@ function updateEvent(array $e, PDO $pdo) {
 function deleteEvent(array $e, PDO $pdo) {
     global $channel;
     $stmt = $pdo->prepare("DELETE FROM events WHERE uid_event = :uniqueid");
-    $stmt->execute([':uniqueid' => $e['uid_event']]);
+    $stmt->execute([':uniqueid' => $e['uid']]);
     if ($stmt->rowCount() > 0) {
-        echo " [✔] Event deleted: {$e['uid_event']}\n";
-        sendLog($channel, "event", "Event deleted: {$e['uid_event']}", "event");
+        echo " [✔] Event deleted: {$e['uid']}\n";
+        sendLog($channel, "event", "Event deleted: {$e['uid']}", "event");
     } else {
-        echo " [!] No event found to delete: {$e['uid_event']}\n";
-        sendLog($channel, "event", "No event found to delete: {$e['uid_event']}", "event");
+        echo " [!] No event found to delete: {$e['uid']}\n";
+        sendLog($channel, "event", "No event found to delete: {$e['uid']}", "event");
     }
 }
 
@@ -365,9 +365,9 @@ function deleteEvent(array $e, PDO $pdo) {
 function createCompany(array $data, PDO $pdo) {
     global $channel;
     $sql = "INSERT INTO company (
-                uid, owner_id, name, company_number, vat_number, address_street, address_number, address_postcode, address_city, billing_address_street, billing_address_number, billing_address_postcode, billing_address_city, email, phone
+                uid, owner_id, name, companyNumber, VATNumber, address_street, address_number, address_postcode, address_city, billing_address_street, billing_address_number, billing_address_postcode, billing_address_city, email, phone
             ) VALUES (
-                :uid, :owner_id, :name, :company_number, :vat_number, :address_street, :address_number, :address_postcode, :address_city, :billing_address_street, :billing_address_number, :billing_address_postcode, :billing_address_city, :email, :phone
+                :uid, :owner_id, :name, :companyNumber, :VATNumber, :address_street, :address_number, :address_postcode, :address_city, :billing_address_street, :billing_address_number, :billing_address_postcode, :billing_address_city, :email, :phone
             )";
     $stmt = $pdo->prepare($sql);
     try {
@@ -375,16 +375,16 @@ function createCompany(array $data, PDO $pdo) {
             ':uid' => $data['uid'],
             ':owner_id' => $data['owner_id'],
             ':name' => trim($data['name']),
-            ':company_number' => $data['company_number'],
-            ':vat_number' => $data['vat_number'],
-            ':address_street' => $data['address_street'],
-            ':address_number' => $data['address_number'],
-            ':address_postcode' => $data['address_postcode'],
-            ':address_city' => $data['address_city'],
-            ':billing_address_street' => $data['billing_address_street'],
-            ':billing_address_number' => $data['billing_address_number'], 
-            ':billing_address_postcode' => $data['billing_address_postcode'], 
-            ':billing_address_city' => $data['billing_address_city'], 
+            ':companyNumber' => $data['companyNumber'],
+            ':VATNumber' => $data['VATNumber'],
+            ':address_street' => $data['address']['street'],
+            ':address_number' => $data['address']['number'],
+            ':address_postcode' => $data['address']['postcode'],
+            ':address_city' => $data['address']['city'],
+            ':billing_address_street' => $data['billingAddress']['street'],
+            ':billing_address_number' => $data['billingAddress']['number'],
+            ':billing_address_postcode' => $data['billingAddress']['postcode'],
+            ':billing_address_city' => $data['billingAddress']['city'],
             ':email' => $data['email'], 
             ':phone' => $data['phone']
         ]);
@@ -399,6 +399,14 @@ function createCompany(array $data, PDO $pdo) {
             sendLog($channel, "company", "Database failed to create company: " . $e->getMessage(), 'company');
         }
     }
+
+    // set uid to owner_id for compatibility with registerCompanyEmployee()
+    
+    $employeeData = $data;
+    $employeeData['uid'] = $data['owner_id'];
+    
+    // add owner to company
+    registerCompanyEmployee($employeeData, $pdo);
 }
 
 /**
@@ -409,8 +417,8 @@ function updateCompany(array $data, PDO $pdo) {
     $sql = "UPDATE company SET
                 owner_id = :owner_id,
                 name = :name,
-                company_number = :company_number,
-                vat_number = :vat_number,
+                companyNumber = :companyNumber,
+                VATNumber = :VATNumber,
                 address_street = :address_street,
                 address_number = :address_number,
                 address_postcode = :address_postcode,
@@ -427,16 +435,16 @@ function updateCompany(array $data, PDO $pdo) {
         $stmt->execute([
             ':owner_id' => $data['owner_id'],
             ':name' => trim($data['name']),
-            ':company_number' => $data['company_number'],
-            ':vat_number' => $data['vat_number'],
-            ':address_street' => $data['address_street'],
-            ':address_number' => $data['address_number'],
-            ':address_postcode' => $data['address_postcode'],
-            ':address_city' => $data['address_city'],
-            ':billing_address_street' => $data['billing_address_street'],
-            ':billing_address_number' => $data['billing_address_number'],
-            ':billing_address_postcode' => $data['billing_address_postcode'],
-            ':billing_address_city' => $data['billing_address_city'],
+            ':companyNumber' => $data['companyNumber'],
+            ':VATNumber' => $data['VATNumber'],
+            ':address_street' => $data['address']['street'],
+            ':address_number' => $data['address']['number'],
+            ':address_postcode' => $data['address']['postcode'],
+            ':address_city' => $data['address']['city'],
+            ':billing_address_street' => $data['billingAddress']['street'],
+            ':billing_address_number' => $data['billingAddress']['number'],
+            ':billing_address_postcode' => $data['billingAddress']['postcode'],
+            ':billing_address_city' => $data['billingAddress']['city'],
             ':email' => $data['email'],
             ':phone' => $data['phone'],
             ':uid' => $data['uid']
@@ -459,7 +467,7 @@ function updateCompany(array $data, PDO $pdo) {
     $employeeData['uid'] = $data['owner_id'];
 
     // add owner to company
-    registerCompanyEmployee($data, $pdo);
+    registerCompanyEmployee($employeeData, $pdo);
 }
 
 /**
@@ -489,29 +497,33 @@ function deleteCompany(array $data, PDO $pdo) {
  */
 function registerCompanyEmployee(array $data, PDO $pdo) {
     global $channel;
+  
+    // set session variable
+    $pdo->exec("SET @is_consumer_source = 1");
+
         $sql = "UPDATE client SET
             company = :name,
-            company_number = :company_number,
-            company_vat = :vat_number
+            company_number = :companyNumber,
+            company_vat = :VATNumber
         WHERE custom_2 = :uid";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
             ':name' => trim($data['name']),
-            ':company_number' => $data['company_number'],
-            ':vat_number' => $data['vat_number'],
+            ':companyNumber' => $data['companyNumber'],
+            ':VATNumber' => $data['VATNumber'],
             ':uid' => $data['uid']
         ]);
         if ($stmt->rowCount() > 0) {
-            echo " [✔] User {$data['uid']} registered with company {$data['company_id']}.\n";
-            sendLog($channel, "company", "User {$data['uid']} registered with company {$data['company_id']}.", 'company-management');
+            echo " [✔] User {$data['uid']} registered with company {$data['name']}.\n";
+            sendLog($channel, "company", "User {$data['uid']} registered with company {$data['name']}.", 'company-management');
         } else {
             echo " [!] No user found to register with UID: {$data['uid']}. Check if it exists.\n";
             sendLog($channel, "company", "No user found to register with UID: {$data['uid']}.", 'company-management');
         }
     } catch (PDOException $e) {
-        echo " [!] Error: Database failed to register user {$data['uid']} with company {$data['company_id']}.\n" . $e->getMessage() . "\n";
-        sendLog($channel, "company", "Database failed to register user {$data['uid']} with company {$data['company_id']}: " . $e->getMessage(), 'company-management');
+        echo " [!] Error: Database failed to register user {$data['uid']} with company {$data['name']}.\n" . $e->getMessage() . "\n";
+        sendLog($channel, "company", "Database failed to register user {$data['uid']} with company {$data['name']}: " . $e->getMessage(), 'company-management');
     }
 }
 
@@ -520,6 +532,10 @@ function registerCompanyEmployee(array $data, PDO $pdo) {
  */
 function unregisterCompanyEmployee(array $data, PDO $pdo) {
     global $channel;
+  
+    // set session variable
+    $pdo->exec("SET @is_consumer_source = 1");
+    
     $sql = "UPDATE client SET
         company = NULL,
         company_number = NULL,
@@ -588,15 +604,15 @@ function getAllUsersWithCompany($data, $pdo) {
     global $channel;
     $sql = "SELECT custom_2 FROM client WHERE 
     company = :name AND
-    company_number = :company_number AND
-    company_vat = :vat_number";
+    company_number = :companyNumber AND
+    company_vat = :VATNumber";
 
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
             ':name' => trim($data['name']),
-            ':company_number' => $data['company_number'],
-            ':vat_number' => $data['vat_number'],
+            ':companyNumber' => $data['companyNumber'],
+            ':VATNumber' => $data['VATNumber'],
         ]);
     } catch (PDOException $e) {
         echo " [!] Database failed to fetch users with company {$data['name']} " . $e->getMessage() . "\n";
