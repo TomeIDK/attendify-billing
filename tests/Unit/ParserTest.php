@@ -2,6 +2,8 @@
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/../../parser.php';
+
 class ParserTest extends TestCase
 {
     // Test XML to JSON conversion
