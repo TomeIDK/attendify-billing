@@ -166,7 +166,7 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
                         break;
                     }
                 }
-                saveItem($data['tab']['items'], $row['row_id'], $row['invoice_id'], $pdo);
+                saveItem($data['tab']['items'], $row['row_id'], $row['invoice_id'], $data['tab']['is_paid'], $pdo);
                 break;
             default:
                 echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";
@@ -734,13 +734,36 @@ function getCompanyInvoiceIdForEvent($company_id, $event_id, $pdo) {
     }
 }
 
-function createInvoice($client_id, $pdo) {
+function createInvoice($client_id, $companyDetails, $pdo) {
     $currentTime = date('Y-m-d H:i:s');
-    $insertInvoiceSql = "INSERT INTO invoice (client_id, created_at, updated_at) VALUES (:client_id, :created_at, :updated_at)"; // SQL to insert into invoice
+    $insertInvoiceSql = "INSERT INTO invoice (
+                            client_id, seller_company, seller_company_vat, seller_company_number, seller_address, seller_phone, seller_email, created_at, updated_at
+                        ) VALUES (
+                            :client_id, :seller_company, :seller_company_vat, :seller_company_number, :seller_address, :seller_phone, :seller_email, 
+                            :buyer_company, :buyer_company_vat, :buyer_company_number, :buyer_address, :buyer_city, :buyer_country, :buyer_zip, :buyer_phone, :buyer_email,
+                            :due_at, :created_at, :updated_at)";
     $stmtInvoice = $pdo->prepare($insertInvoiceSql);
     try {
         $stmtInvoice->execute([
-            ':client_id' => $client_id, 
+            ':client_id' => $client_id,
+            ':seller_company' => "Attendify",
+            ':seller_company_vat' => "BE 0897.456.321",
+            ':seller_company_number' => "0897.456.321",
+            ':seller_address' => "Quai de l'Industrie 170, 1070 Anderlecht",
+            ':seller_phone' => "04 41 34 27 78",
+            ':seller_email' => "contact@attendify.com",
+        
+            ':buyer_company' => $companyDetails['name'],
+            ':buyer_company_vat' => $companyDetails['VATNumber'],
+            ':buyer_company_number' => $companyDetails['companyNumber'],
+            ':buyer_address' => $companyDetails['billing_address_street'] . $companyDetails['billing_address_number'],
+            ':buyer_city' => $companyDetails['billing_address_city'],
+            ':buyer_country' => "Belgium",
+            ':buyer_zip' => $companyDetails['billing_address_postcode'],
+            ':buyer_phone' => $companyDetails['phone'],
+            ':buyer_email' => $companyDetails['email'],
+        
+            ':due_at' => strtotime($currentTime . ' +14 days'),
             ':created_at' => $currentTime,
             ':updated_at' => $currentTime
         ]);
@@ -767,7 +790,7 @@ function generateInvoiceId($company_id, $event_id, $pdo) {
     }
 
     // Create new invoice
-    $invoiceId = createInvoice($owner_id, $pdo);
+    $invoiceId = createInvoice($owner_id, $companyDetails, $pdo);
     if ($invoiceId === null) {
         return null;
     }
@@ -837,7 +860,7 @@ function registerUserWithEvent($client_id, $event_id, $invoice_id = null, $regis
 /**
  * save invoice item to invoice_item table
  */
-function saveItem($data, $row_id, $invoice_id, $pdo) {
+function saveItem($data, $row_id, $invoice_id, $charged, $pdo) {
     // for each tab_item in $data create a new invoice_item with invoice_id
     // row_id is the id of the client_event row, maybe rel_id can be used for this? Check docs or ask chat what it's for
     // no return, just log messages
@@ -848,8 +871,12 @@ function saveItem($data, $row_id, $invoice_id, $pdo) {
         echo " [!] No items data provided to saveItem. Skipping.\n";
         return;
     }
+    $currentTime = date('Y-m-d H:i:s');
 
-    $insertItemSql = "INSERT INTO invoice_item (invoice_id, title, quantity, price, taxed) VALUES (:invoice_id, :title, :quantity, :price, :taxed)";
+    $insertItemSql = "INSERT INTO invoice_item (
+                        invoice_id, rel_id, status, title, quantity, price, charged, taxed, created_at, updated_at
+                    ) VALUES (
+                        :invoice_id, :rel_id, :status, :title, :quantity, :price, :charged, :taxed, :created_at, :updated_at)";
     $stmtItem = $pdo->prepare($insertItemSql);
 
     foreach ($data as $item) {
@@ -867,10 +894,15 @@ function saveItem($data, $row_id, $invoice_id, $pdo) {
 
             $stmtItem->execute([
                 ':invoice_id' => $invoice_id,
+                ':rel_id' => $row_id,
+                ':status' => $charged ? 'paid' : null,
                 ':title' => $item['title'],
                 ':quantity' => $item['quantity'],
                 ':price' => $item['price'],
-                ':taxed' => $item['taxed'] ?? false
+                ':charged' => $charged,
+                ':taxed' => true,
+                ':created_at' => $currentTime,
+                ':updated_at' => $currentTime,
             ]);
             echo " [✔] Saved item '{$item['title']}' to invoice_item table (Invoice ID: " . ($invoice_id ?? 'NULL') . ")\n";
         } catch (PDOException $e) {
