@@ -134,6 +134,9 @@ function isUserRegisteredWithACompany($client_id, $pdo, $channel) {
     return ($row !== true);
 }
 
+/**
+ * get the client_id of the company's owner
+ */
 function getCompanyOwnerId($company_id, $pdo, $channel) {
     // 1. fetch owner_id and other data of company by company_id in company table.
     // 2. return this data
@@ -149,6 +152,9 @@ function getCompanyOwnerId($company_id, $pdo, $channel) {
     }
 }
 
+/**
+ * get a company
+ */
 function getCompany($data, $pdo, $channel) {
     global $channel;
     $sql = "SELECT * FROM company WHERE uid = :uid";
