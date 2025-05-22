@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS events (
     max_attendees INT COMMENT 'Maximum number of attendees allowed',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    processed BOOLEAN DEFAULT FALSE
 );
 
