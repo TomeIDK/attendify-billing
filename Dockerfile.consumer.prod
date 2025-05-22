@@ -30,10 +30,11 @@ WORKDIR /app
 COPY consumers/composer.json consumers/composer.lock ./consumers/
 
 # copy consumers code
-COPY consumers/ /app/consumers/
+COPY consumers/*.php /app/consumers/
 
 # copy utility files
 COPY parser.php /app
+COPY logger.php /app
 
 # install composer dependencies
 RUN composer install --no-dev --prefer-dist --no-progress --working-dir=/app/consumers
