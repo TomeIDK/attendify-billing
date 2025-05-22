@@ -30,10 +30,11 @@ WORKDIR /app
 COPY producers/composer.json producers/composer.lock ./producers/
 
 # copy producers code
-COPY producers/ /app/producers/
+COPY producers/*.php /app/producers/
 
 # copy utility files
 COPY parser.php /app
+COPY logger.php /app
 
 # install composer dependencies
 RUN composer install --prefer-dist --no-progress --working-dir=/app/producers

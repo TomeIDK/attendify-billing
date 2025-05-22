@@ -1,6 +1,14 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../logger.php';
+require_once __DIR__ . '/user.php';
+require_once __DIR__ . '/event.php';
+require_once __DIR__ . '/company.php';
+require_once __DIR__ . '/company_employee.php';
+require_once __DIR__ . '/invoice_item.php';
+require_once __DIR__ . '/invoice.php';
+require_once __DIR__ . '/helper.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -8,7 +16,6 @@ use PhpAmqpLib\Message\AMQPMessage;
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->safeload();
 
-define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
 
 // --- DATABASE CONNECTIE via PDO ---
@@ -43,6 +50,7 @@ pcntl_signal(SIGINT, function() use ($channel, $connection) {
 
 // --- CONSUMER CALLBACK ---
 $callback = function(AMQPMessage $msg) use ($pdo) {
+    global $channel;
     echo " [x] Message received.\n";
     try {
         $jsonData = xmlToJson($msg->getBody());
@@ -69,13 +77,13 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         // Process user operations
         switch ($operation) {
             case 'create':
-                createUser($data['user'], $pdo);
+                createUser($data['user'], $pdo, $channel);
                 break;
             case 'update':
-                updateUser($data['user'], $pdo);
+                updateUser($data['user'], $pdo, $channel);
                 break;
             case 'delete':
-                deleteUser($data['user'], $pdo);
+                deleteUser($data['user'], $pdo, $channel);
                 break;
             default:
                 echo " [!] Unknown operation '{$operation}' for user. Skipping...\n";
@@ -85,16 +93,96 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         // Process event operations
         switch ($operation) {
             case 'create':
-                createEvent($data['event'], $pdo);
+                createEvent($data['event'], $pdo, $channel);
                 break;
             case 'update':
-                updateEvent($data['event'], $pdo);
+                updateEvent($data['event'], $pdo, $channel);
                 break;
             case 'delete':
-                deleteEvent($data['event'], $pdo);
+                deleteEvent($data['event'], $pdo, $channel);
                 break;
             default:
                 echo " [!] Unknown operation '{$operation}' for event. Skipping...\n";
+                break;
+        }
+    } elseif (isset($data['companies'])) {
+        // Process company operations
+        switch ($operation) {
+            case 'create':
+                createCompany($data['companies']['company'], $pdo, $channel);
+                // set uid to owner_id for compatibility with registerCompanyEmployee()
+                $employeeData = $data['companies']['company'];
+                $employeeData['company_id'] = $data['companies']['company']['uid'];
+                $employeeData['uid'] = $data['companies']['company']['owner_id'];
+                registerCompanyEmployee($employeeData, $pdo, $channel);
+                linkUserWithCompany($employeeData, $pdo, $channel);
+                break;
+            case 'update':
+                updateCompany($data['companies']['company'], $pdo, $channel);
+                // set uid to owner_id for compatibility with registerCompanyEmployee()
+                $employeeData = $data['companies']['company'];
+                $employeeData['company_id'] = $data['companies']['company']['uid'];
+                $employeeData['uid'] = $data['companies']['company']['owner_id'];
+                registerCompanyEmployee($employeeData, $pdo, $channel);
+                linkUserWithCompany($employeeData, $pdo, $channel);
+                break;
+            case 'delete':
+                deleteCompany($data['companies']['company'], $pdo, $channel);
+                unregisterAllUsersFromCompany($data['companies']['company'], $pdo, $channel);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for event. Skipping...\n";
+                break;
+        }
+    } elseif (isset($data['company_employee'])) {
+        // Process company employee operations
+        switch ($operation) {
+            case 'register':
+                $companyData = getCompany($data['company_employee'], $pdo, $channel);
+                if ($companyData == null){ 
+                    echo " [!] No company found with UID: {$data['company_id']}. Check if it exists.\n";
+                    break;
+                }
+
+                $data['company_employee']['name'] = $companyData['name'];
+                $data['company_employee']['companyNumber'] = $companyData['companyNumber'];
+                $data['company_employee']['VATNumber'] = $companyData['VATNumber'];
+
+                registerCompanyEmployee($data['company_employee'], $pdo, $channel);
+                linkUserWithCompany($data['company_employee'], $pdo, $channel);
+                break;
+            case 'unregister':
+                unregisterCompanyEmployee($data['company_employee'], $pdo, $channel);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";
+                break;
+        }
+    } elseif (isset($data['tab'])) {
+        // process payment messages
+        switch ($operation) {
+            case 'create':
+                $row = [];
+                $row = isUserRegistered($data['tab']['uid'], $data['tab']['event_id'], $pdo, $channel);
+
+                if ($row == false) {
+                    $company_id = getUserCompanyId($data['tab']['uid'], $pdo, $channel);
+                    if ($company_id == null) {
+                        break;
+                    }
+
+                    if ($company_id) {
+                        $row['invoice_id'] = getCompanyInvoiceIdForEvent($company_id, $data['tab']['event_id'], $pdo, $channel);
+                    }
+                    $row['id'] = registerUserWithEvent($data['tab']['uid'], $data['tab']['event_id'], $row['invoice_id'], $data['tab']['timestamp'], $pdo, $channel);
+                    if ($row['id'] == null) {
+                        break;
+                    }
+                }
+                saveItem($data['tab']['items'], $row['id'], $row['invoice_id'], $data['tab']['is_paid'], $pdo, $channel);
+                break;
+            default:
+                echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";
                 break;
         }
     } else {
@@ -105,9 +193,9 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
 };
 
 // Declare which queues to consume from
-$queues = ['billing.invoice', 'billing.user'];
+$queues = ['billing.event', 'billing.user', 'billing.company', 'billing.sale'];
 
-// Set up consumption from both queues
+// Set up consumption for all queues
 foreach ($queues as $queue) {
     $channel->basic_consume($queue, '', false, false, false, false, $callback);
     echo " [*] Consuming from queue: $queue\n";
@@ -118,167 +206,4 @@ echo " [*] Waiting for messages. Press CTRL+C to exit.\n";
 // Process messages from any of the queues
 while ($channel->is_consuming()) {
     $channel->wait();
-}
-
-
-// --- USER CRUD FUNCTIONS ---
-
-/**
- * Insert a new user into the users table.
- */
-function createUser(array $data, PDO $pdo) {
-    $currentTime = date('Y-m-d H:i:s');
-
-    // Set session variable to indicate consumer is making the change
-    $pdo->exec("SET @is_consumer_source = 1");
-
-    $sql = "INSERT INTO client (
-                email, pass, first_name, last_name, custom_1, custom_2, created_at, updated_at
-            ) VALUES (
-                :email, :pass, :first_name, :last_name, :custom_1, :custom_2, :created_at, :updated_at
-            )";
-    $stmt = $pdo->prepare($sql);
-    try {
-        $stmt->execute([
-            ':email'          => $data['email'],
-            ':pass'           => $data['password'],
-            ':first_name'     => $data['first_name'],
-            ':last_name'      => $data['last_name'],
-            ':custom_1'       => trim($data['title']),
-            ':custom_2'       => $data['uid'],
-            ':created_at'     => $currentTime,
-            ':updated_at'     => $currentTime,
-        ]);
-        echo " [✔] User created successfully: {$data['email']}\n";
-    } catch (PDOException $e) {
-        if ($e->getCode() == 23000) {
-            echo " [!] User with email {$data['email']} already exists. Skipping...\n";
-        } else {
-            echo " [!] Error: Database failed to create user.\n" . $e->getMessage() . "\n";
-        }
-    }
-}
-
-/**
- * Update an existing user in the users table.
- */
-function updateUser(array $data, PDO $pdo) {
-    $currentTime = date('Y-m-d H:i:s');
-
-    $sql = "UPDATE client SET
-                pass = :pass,
-                email = :email,
-                first_name = :first_name,
-                last_name = :last_name,
-                custom_1 = :custom_1,
-                updated_at = :updated_at
-            WHERE custom_2 = :custom_2";
-    $stmt = $pdo->prepare($sql);
-    try {
-        $stmt->execute([
-            ':email'          => $data['email'],
-            ':pass'           => $data['password'],
-            ':first_name'     => $data['first_name'],
-            ':last_name'      => $data['last_name'],
-            ':custom_1'       => trim($data['title']),
-            ':custom_2'       => $data['uid'],
-            ':updated_at'     => $currentTime,
-        ]);
-        if ($stmt->rowCount() > 0) {
-            echo " [✔] User updated with UID: {$data['uid']}\n";
-        } else {
-            echo " [!] No user found to update with UID: {$data['uid']}. Check if it exists.\n";
-          
-        }
-    } catch (PDOException $e) {
-        echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
-    }
-}
-
-/**
- * Delete a user from the users table.
- */
-function deleteUser(array $data, PDO $pdo) {
-    $sql = "DELETE FROM client WHERE custom_2 = :custom_2";
-    $stmt = $pdo->prepare($sql);
-    try {
-        $stmt->execute([':custom_2' => $data['uid']]);
-        if ($stmt->rowCount() > 0) {
-            echo " [✔] User successfully deleted with UID: {$data['uid']}\n";
-        } else {
-            echo " [!] No user found with UID: {$data['uid']}.\n";
-        }
-    } catch (PDOException $e) {
-        echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
-    }
-}
-
-// --- EVENT CRUD FUNCTIONS ---
-
-/**
- * Insert a new event into the events table.
- */
-function createEvent(array $e, PDO $pdo) {
-    $sql = "INSERT INTO events
-        (uid_event, name, start_date, end_date, address, description, max_attendees)
-     VALUES
-        (:uniqueid, :name, :start, :end, :addr, :desc, :max)";
-    $stmt = $pdo->prepare($sql);
-    try {
-        $stmt->execute([
-            ':uniqueid'   => $e['uid_event'],
-            ':name'  => $e['name'],
-            ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
-            ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
-            ':addr'  => $e['address'],
-            ':desc'  => $e['description'] ?? null,
-            ':max'   => (int) trim($e['max_attendees'] ?? 0),
-        ]);
-        echo " [✔] Event created: {$e['uid_event']}\n";
-    } catch (PDOException $ex) {
-        echo " [!] Failed to create event {$e['uid_event']}: " . $ex->getMessage() . "\n";
-    }
-}
-
-/**
- * Update an existing event in the events table.
- */
-function updateEvent(array $e, PDO $pdo) {
-    $sql = "UPDATE events SET
-                name = :name,
-                start_date = :start,
-                end_date   = :end,
-                address    = :addr,
-                description= :desc,
-                max_attendees = :max,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE uid_event = :uniqueid";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        ':uniqueid'   => $e['uid_event'],
-        ':name'  => $e['name'],
-        ':start' => date('Y-m-d H:i:s', strtotime($e['start_date'])),
-        ':end'   => date('Y-m-d H:i:s', strtotime($e['end_date'])),
-        ':addr'  => $e['address'],
-        ':desc'  => $e['description'] ?? null,
-        ':max'   => (int) trim($e['max_attendees'] ?? 0),
-    ]);
-    if ($stmt->rowCount() > 0) {
-        echo " [✔] Event updated: {$e['uid_event']}\n";
-    } else {
-        echo " [!] No event found to update: {$e['uid_event']}\n";
-    }
-}
-
-/**
- * Delete an event from the events table.
- */
-function deleteEvent(array $e, PDO $pdo) {
-    $stmt = $pdo->prepare("DELETE FROM events WHERE uid_event = :uniqueid");
-    $stmt->execute([':uniqueid' => $e['uid_event']]);
-    if ($stmt->rowCount() > 0) {
-        echo " [✔] Event deleted: {$e['uid_event']}\n";
-    } else {
-        echo " [!] No event found to delete: {$e['uid_event']}\n";
-    }
 }

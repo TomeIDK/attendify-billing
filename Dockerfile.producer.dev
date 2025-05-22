@@ -34,6 +34,7 @@ COPY producers/*.php /app/producers/
 
 # copy utility files
 COPY parser.php /app
+COPY logger.php /app
 
 # install composer dependencies
 RUN composer install --prefer-dist --no-progress --working-dir=/app/producers

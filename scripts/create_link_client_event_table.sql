@@ -1,0 +1,7 @@
+CREATE TABLE client_event (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_uid VARCHAR(255) NOT NULL,
+    client_id VARCHAR(255) NOT NULL,
+    invoice_id BIGINT NULL,
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -30,5 +30,6 @@ jobs:
             set -e
             cd /home/ehbstudent/attendify/test-environment/testing-Billing/attendify-billing
             git pull origin release
+            cd /home/ehbstudent/attendify/test-environment
             docker compose up --build -d
           EOF

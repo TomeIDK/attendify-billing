@@ -1,7 +1,7 @@
 <?php
 
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -106,7 +106,7 @@ function startHeartbeatService() {
                 if ($result["status"] == "up")
                 {
                     sendHeartbeat($channel, $service['name'], $result['status'], $result['error']);
-                    echo " [✔] Heartbeat sent for '{$service["name"]}'";
+                    echo " [✔] Heartbeat sent for '{$service["name"]}'\n";
 
                 }
             }
@@ -133,18 +133,4 @@ function startHeartbeatService() {
     $connection->close();
 }
 
-// // Simple test mode - just check services without RabbitMQ
-// if (isset($argv[1]) && $argv[1] === 'test') {
-//     echo "Testing service status...\n";
-//     foreach ($services as $service) {
-//         $result = checkServiceStatus($service);
-//         echo "Service: {$service['name']}\n";
-//         echo "Status: {$result['status']}\n";
-//         if ($result['error']) {
-//             echo "Error: {$result['error']}\n";
-//         }
-//         echo "-------------------\n";
-//     }
-// } else {
-    startHeartbeatService();
-// }
+startHeartbeatService();
