@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 require_once __DIR__ . '/../logger.php';
 require_once __DIR__ . '/helper.php';
 
@@ -28,11 +28,13 @@ function createEvent(array $e, PDO $pdo, $channel) {
             ':desc'  => $e['description'] ?? null,
             ':max'   => (int) trim($e['max_attendees'] ?? 0),
         ]);
+        $stmt->closeCursor();
         echo " [✔] Event created: {$e['uid']}\n";
         sendLog($channel, "event", "Event created: {$e['uid']}", "event");
     } catch (PDOException $ex) {
         echo " [!] Failed to create event {$e['uid']}: " . $ex->getMessage() . "\n";
         sendLog($channel, "event", "Failed to create event {$e['uid']}: " . $ex->getMessage(), "event");
+        $stmt->closeCursor();
     }
 }
 
@@ -68,6 +70,7 @@ function updateEvent(array $e, PDO $pdo, $channel) {
         echo " [!] No event found to update: {$e['uid']}\n";
         sendLog($channel, "event", "No event found to update: {$e['uid']}", "event");
     }
+    $stmt->closeCursor();
 }
 
 /**
@@ -85,4 +88,5 @@ function deleteEvent(array $e, PDO $pdo, $channel) {
         echo " [!] No event found to delete: {$e['uid']}\n";
         sendLog($channel, "event", "No event found to delete: {$e['uid']}", "event");
     }
+    $stmt->closeCursor();
 }

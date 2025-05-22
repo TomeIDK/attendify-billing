@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 require_once __DIR__ . '/../logger.php';
 require_once __DIR__ . '/helper.php';
 
@@ -36,7 +36,7 @@ function createUser(array $data, PDO $pdo, $channel) {
             ':created_at'     => $currentTime,
             ':updated_at'     => $currentTime,
         ]);
-
+        $stmt->closeCursor();
         echo " [✔] User created successfully: {$data['email']}\n";
         sendLog($channel, "user", "User created successfully: {$data['uid']}", 'user-management');
     } catch (PDOException $e) {
@@ -47,6 +47,7 @@ function createUser(array $data, PDO $pdo, $channel) {
             echo " [!] Error: Database failed to create user.\n" . $e->getMessage() . "\n";
             sendLog($channel, "user", "Database failed to create user: " . $e->getMessage(), 'user-management');
         }
+        $stmt->closeCursor();
     }
 }
 
@@ -88,9 +89,11 @@ function updateUser(array $data, PDO $pdo, $channel) {
             echo " [!] No user found to update with UID: {$data['uid']}. Check if it exists.\n";
             sendLog($channel, "user", "No user found to update with UID: {$data['uid']}.", 'user-management');
         }
+        $stmt->closeCursor();
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update user.\n" . $e->getMessage() . "\n";
         sendLog($channel, "user", "Database failed to update user: " . $e->getMessage(), 'user-management');
+        $stmt->closeCursor();
     }
 }
 
@@ -113,8 +116,10 @@ function deleteUser(array $data, PDO $pdo, $channel) {
             echo " [!] No user found with UID: {$data['uid']}.\n";
             sendLog($channel, "user", "No user found with UID: {$data['uid']}.", 'user-management');
         }
+        $stmt->closeCursor();
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete user.\n" . $e->getMessage() . "\n";
         sendLog($channel, "user", "Database failed to delete user: " . $e->getMessage(), 'user-management');
+        $stmt->closeCursor();
     }
 }

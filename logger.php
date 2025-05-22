@@ -32,7 +32,6 @@ function sendLog($channel, $service, $messageContent, $exchange) {
     $msg = new AMQPMessage($xmlString, ['content_type' => 'application/xml']);
 
     try {
-        echo " [debug] Sending log message to monitoring.log:\n$xmlString\n";
         $channel->basic_publish($msg, $exchange, 'monitoring.log');
     } catch (Exception $e) {
         echo " [!] Failed to publish log message: " . $e->getMessage() . "\n";

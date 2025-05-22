@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 require_once __DIR__ . '/../logger.php';
 require_once __DIR__ . '/user.php';
 require_once __DIR__ . '/event.php';
@@ -56,9 +56,6 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         $jsonData = xmlToJson($msg->getBody());
         $data = json_decode($jsonData, true)['attendify'];
         echo " [x] Parsed data.\n";
-        echo " [debug] Decoded data:\n";
-        print_r($data);
-
     } catch (Exception $e) {
         echo " [!] Error parsing XML: " . $e->getMessage() . "\n";
         return;
@@ -113,9 +110,21 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         switch ($operation) {
             case 'create':
                 createCompany($data['companies']['company'], $pdo, $channel);
+                // set uid to owner_id for compatibility with registerCompanyEmployee()
+                $employeeData = $data['companies']['company'];
+                $employeeData['company_id'] = $data['companies']['company']['uid'];
+                $employeeData['uid'] = $data['companies']['company']['owner_id'];
+                registerCompanyEmployee($employeeData, $pdo, $channel);
+                linkUserWithCompany($employeeData, $pdo, $channel);
                 break;
             case 'update':
                 updateCompany($data['companies']['company'], $pdo, $channel);
+                // set uid to owner_id for compatibility with registerCompanyEmployee()
+                $employeeData = $data['companies']['company'];
+                $employeeData['company_id'] = $data['companies']['company']['uid'];
+                $employeeData['uid'] = $data['companies']['company']['owner_id'];
+                registerCompanyEmployee($employeeData, $pdo, $channel);
+                linkUserWithCompany($employeeData, $pdo, $channel);
                 break;
             case 'delete':
                 deleteCompany($data['companies']['company'], $pdo, $channel);
@@ -140,6 +149,7 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
                 $data['company_employee']['VATNumber'] = $companyData['VATNumber'];
 
                 registerCompanyEmployee($data['company_employee'], $pdo, $channel);
+                linkUserWithCompany($data['company_employee'], $pdo, $channel);
                 break;
             case 'unregister':
                 unregisterCompanyEmployee($data['company_employee'], $pdo, $channel);
@@ -152,10 +162,8 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
         // process payment messages
         switch ($operation) {
             case 'create':
+                $row = [];
                 $row = isUserRegistered($data['tab']['uid'], $data['tab']['event_id'], $pdo, $channel);
-                if ($row == null) {
-                    break;
-                }
 
                 if ($row == false) {
                     $company_id = getUserCompanyId($data['tab']['uid'], $pdo, $channel);
@@ -165,16 +173,13 @@ $callback = function(AMQPMessage $msg) use ($pdo) {
 
                     if ($company_id) {
                         $row['invoice_id'] = getCompanyInvoiceIdForEvent($company_id, $data['tab']['event_id'], $pdo, $channel);
-                        if ($row['invoice_id'] == null) {
-                            break;
-                        }
                     }
-                    $row['row_id'] = registerUserWithEvent($data['tab']['uid'], $data['tab']['event_id'], $row['invoice_id'], $data['tab']['timestamp'], $pdo, $channel);
-                    if ($row['row_id'] == null) {
+                    $row['id'] = registerUserWithEvent($data['tab']['uid'], $data['tab']['event_id'], $row['invoice_id'], $data['tab']['timestamp'], $pdo, $channel);
+                    if ($row['id'] == null) {
                         break;
                     }
                 }
-                saveItem($data['tab']['items'], $row['row_id'], $row['invoice_id'], $data['tab']['is_paid'], $pdo, $channel);
+                saveItem($data['tab']['items'], $row['id'], $row['invoice_id'], $data['tab']['is_paid'], $pdo, $channel);
                 break;
             default:
                 echo " [!] Unknown operation '{$operation}' for company employee. Skipping...\n";

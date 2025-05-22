@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 require_once __DIR__ . '/../logger.php';
 require_once __DIR__ . '/helper.php';
 
@@ -25,10 +25,13 @@ function registerUserWithEvent($client_id, $event_id, $invoice_id = null, $regis
             ':invoice_id' => $invoice_id,
             ':registered_at' => $registered_at
         ]);
+        $id = $pdo->lastInsertId();
+        $stmt->closeCursor();
 
-        return $pdo->lastInsertId();
+        return $id;
     } catch (PDOException $e) {
         echo " [!] Database failed to register client to event: " . $e->getMessage() . "\n";
+        $stmt->closeCursor();
         return null;
     }
 }
@@ -43,6 +46,11 @@ function saveItem($data, $row_id, $invoice_id, $charged, $pdo, $channel) {
     }
 
     $currentTime = date('Y-m-d H:i:s');
+    if ($charged) {
+        $charged = 1;
+    } else {
+        $charged = 0;
+    }
 
     $insertItemSql = "INSERT INTO invoice_item (
                         invoice_id, rel_id, status, title, quantity, price, charged, taxed, created_at, updated_at
@@ -50,13 +58,7 @@ function saveItem($data, $row_id, $invoice_id, $charged, $pdo, $channel) {
                         :invoice_id, :rel_id, :status, :title, :quantity, :price, :charged, :taxed, :created_at, :updated_at)";
     $stmtItem = $pdo->prepare($insertItemSql);
 
-    foreach ($data as $item) {
-        
-        if (!isset($item['title'], $item['quantity'], $item['price'], $item['taxed'])) {
-            echo " [!] Skipping item due to missing data.\n";
-            continue; 
-        }
-
+    foreach ($data['tab_item'] as $item) {
         try {
             // Calculate BTW amount based on taxed status
             //$isTaxed = $item['taxed'] ?? false;
@@ -67,17 +69,19 @@ function saveItem($data, $row_id, $invoice_id, $charged, $pdo, $channel) {
                 ':invoice_id' => $invoice_id,
                 ':rel_id' => $row_id,
                 ':status' => $charged ? 'paid' : null,
-                ':title' => $item['title'],
+                ':title' => $item['item_name'],
                 ':quantity' => $item['quantity'],
                 ':price' => $item['price'],
                 ':charged' => $charged,
-                ':taxed' => true,
+                ':taxed' => 1,
                 ':created_at' => $currentTime,
                 ':updated_at' => $currentTime,
             ]);
-            echo " [✔] Saved item '{$item['title']}' to invoice_item table (Invoice ID: " . ($invoice_id ?? 'NULL') . ")\n";
+            echo " [✔] Saved item '{$item['item_name']}' to invoice_item table (Invoice ID: " . ($invoice_id ?? 'NULL') . ")\n";
+            $stmtItem->closeCursor();
         } catch (PDOException $e) {
             echo " [!] Error: Database failed to save item: " . $e->getMessage() . "\n";
+            $stmtItem->closeCursor();
         }
     }
 }

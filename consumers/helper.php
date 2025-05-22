@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 require_once __DIR__ . '/../logger.php';
 
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
@@ -26,6 +26,7 @@ function getUserCompanyId($client_id, $pdo, $channel) {
     }
 
     $row = $stmt->fetch();
+    $stmt->closeCursor();
 
     return ($row !== false) ? $row['company_id'] : false;
 }
@@ -50,9 +51,11 @@ function getCompanyInvoiceIdForEvent($company_id, $event_id, $pdo, $channel) {
         return null;
     }
 
-    $row = $stmt->fetch();
+    $row = $stmt->fetchColumn();
+    $stmt->closeCursor();
 
     if ($row !== false) {
+        echo " [x] Fetched invoice_id {$row} for company {$company_id} and event {$event_id}";
         return $row['invoice_id'];
     } else {
         return generateInvoiceId($company_id, $event_id, $pdo, $channel);
@@ -80,6 +83,7 @@ function isUserRegistered($client_id, $event_id, $pdo, $channel) {
     }
 
     $row = $stmt->fetch();
+    $stmt->closeCursor();
 
     return ($row !== false) ? $row : false;
 }
@@ -88,7 +92,6 @@ function isUserRegistered($client_id, $event_id, $pdo, $channel) {
  * get all client id's that are registered with a company
  */
 function getAllUsersWithCompany($data, $pdo, $channel) {
-    global $channel;
     $sql = "SELECT custom_2 FROM client WHERE 
     company = :name AND
     company_number = :companyNumber AND
@@ -108,6 +111,7 @@ function getAllUsersWithCompany($data, $pdo, $channel) {
     }
 
     $rows = $stmt->fetchAll();
+    $stmt->closeCursor();
 
     return (!empty($rows)) ? $rows : null;
 }
@@ -115,39 +119,39 @@ function getAllUsersWithCompany($data, $pdo, $channel) {
 /**
  * check if a user is already with a company
  */
-function isUserRegisteredWithACompany($client_id, $pdo, $channel) {
-    $sql = "SELECT * FROM company_client WHERE 
-    client_id = :client_id";
+function isUserRegisteredWithACompany($client_id, $pdo) {
+    $sql = "SELECT 1 FROM company_client WHERE client_id = :client_id LIMIT 1";
 
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([
             ':client_id' => $client_id
         ]);
+        $row = $stmt->fetchColumn();
+        $stmt->closeCursor();
+        return $row !== false;
     } catch (PDOException $e) {
         echo " [!] Database failed to fetch user {$client_id} from company_client table" . $e->getMessage() . "\n";
+        $stmt->closeCursor();
         return null;
     }
-
-    $row = $stmt->fetch();
-
-    return ($row !== true);
 }
 
 /**
  * get the client_id of the company's owner
  */
 function getCompanyOwnerId($company_id, $pdo, $channel) {
-    // 1. fetch owner_id and other data of company by company_id in company table.
-    // 2. return this data
-    $sql = "SELECT owner_id FROM company WHERE uid = :company_id"; // Fetches the owner_id
+    $sql = "SELECT owner_id FROM company WHERE uid = :company_id";
     $stmt = $pdo->prepare($sql);
     try {
         $stmt->execute([':company_id' => $company_id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC); // Fetches the data (specifically the owner_id column)
-        return $row ? $row['owner_id'] : null; // Returns the owner_id, or null if not found
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        return $row ? $row['owner_id'] : null;
     } catch (PDOException $e) {
-        echo " [!] Database failed to fetch company owner ID: " . $e->getMessage() . "\\n";
+        echo " [!] Database failed to fetch company owner ID: " . $e->getMessage() . "\n";
+        $stmt->closeCursor();
+
         return null;
     }
 }
@@ -156,7 +160,6 @@ function getCompanyOwnerId($company_id, $pdo, $channel) {
  * get a company
  */
 function getCompany($data, $pdo, $channel) {
-    global $channel;
     $sql = "SELECT * FROM company WHERE uid = :uid";
 
     $stmt = $pdo->prepare($sql);
@@ -167,10 +170,32 @@ function getCompany($data, $pdo, $channel) {
     } catch (PDOException $e) {
         echo " [!] Database failed to fetch company with UID: {$data['company_id']} " . $e->getMessage() . "\n";
         sendLog($channel, "company", "Database failed to fetch company with UID: {$data['company_id']}: " . $e->getMessage(), 'company');
+        $stmt->closeCursor();
         return null;
     }
 
     $row = $stmt->fetch();
+    $stmt->closeCursor();
 
     return ($row !== false) ? $row : null;
+}
+
+function getClientInternalId($client_id, $pdo, $channel) {
+    $sql = "SELECT id FROM client WHERE custom_2 = :client_id";
+
+    $stmt = $pdo->prepare($sql);
+    try {
+        $stmt->execute([
+            ':client_id' => $client_id
+        ]);
+    } catch (PDOException $e) {
+        echo " [!] Database failed to fetch user with UID: {$client_id} " . $e->getMessage() . "\n";
+        $stmt->closeCursor();
+        return null;
+    }
+
+    $row = $stmt->fetch();
+    $stmt->closeCursor();
+
+    return ($row !== false) ? $row['id'] : null;
 }

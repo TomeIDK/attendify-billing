@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/vendor/autoload.php';
-require __DIR__ . '/../parser.php';
+require_once __DIR__ . '/../parser.php';
 require_once __DIR__ . '/../logger.php';
 require_once __DIR__ . '/company_employee.php';
 require_once __DIR__ . '/helper.php';
@@ -36,6 +36,7 @@ function createCompany(array $data, PDO $pdo, $channel) {
             ':email' => $data['email'], 
             ':phone' => $data['phone']
         ]);
+        $stmt->closeCursor();
         echo " [✔] Company {$data['name']} created successfully: {$data['uid']}\n";
         sendLog($channel, "company", "Company {$data['name']} created successfully: {$data['uid']}", 'company');
     } catch (PDOException $e) {
@@ -46,14 +47,8 @@ function createCompany(array $data, PDO $pdo, $channel) {
             echo " [!] Error: Database failed to create company.\n" . $e->getMessage() . "\n";
             sendLog($channel, "company", "Database failed to create company: " . $e->getMessage(), 'company');
         }
+        $stmt->closeCursor();
     }
-
-    // set uid to owner_id for compatibility with registerCompanyEmployee()
-    $employeeData = $data;
-    $employeeData['uid'] = $data['owner_id'];
-    
-    // add owner to company
-    registerCompanyEmployee($employeeData, $pdo, $channel);
 }
 
 /**
@@ -102,17 +97,12 @@ function updateCompany(array $data, PDO $pdo, $channel) {
             echo " [!] No company found to update with UID: {$data['uid']}. Check if it exists.\n";
             sendLog($channel, "company", "No company found to update with UID: {$data['uid']}.", 'company');
         }
+        $stmt->closeCursor();
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to update company.\n" . $e->getMessage() . "\n";
         sendLog($channel, "company", "Database failed to update company: " . $e->getMessage(), 'company');
+        $stmt->closeCursor();
     }
-
-    // set uid to owner_id for compatibility with registerCompanyEmployee()
-    $employeeData = $data;
-    $employeeData['uid'] = $data['owner_id'];
-
-    // add owner to company
-    registerCompanyEmployee($employeeData, $pdo, $channel);
 }
 
 /**
@@ -130,8 +120,10 @@ function deleteCompany(array $data, PDO $pdo, $channel) {
             echo " [!] No company found with UID: {$data['uid']}.\n";
             sendLog($channel, "company", "No company found with UID: {$data['uid']}.", 'company');
         }
+        $stmt->closeCursor();
     } catch (PDOException $e) {
         echo " [!] Error: Database failed to delete company.\n" . $e->getMessage() . "\n";
         sendLog($channel, "company", "Error: Database failed to delete company: " . $e->getMessage(), 'company');
+        $stmt->closeCursor();
     }
 }
