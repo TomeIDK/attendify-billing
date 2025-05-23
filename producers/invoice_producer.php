@@ -7,6 +7,8 @@ require_once __DIR__ . '/../logger.php';
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
+declare(ticks = 1);
+
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
@@ -31,11 +33,6 @@ $connection = new AMQPStreamConnection(
 );
 $channel = $connection->channel();
 
-// Declare exchange and queue for outgoing invoice messages
-$channel->exchange_declare('invoice', 'direct', false, true, false);
-$channel->queue_declare('invoice_xml', false, true, false, false);
-$channel->queue_bind('invoice_xml', 'invoice', 'invoice.created');
-
 echo " [x] Connected to RabbitMQ.\n";
 
 // Graceful shutdown on CTRL+C
@@ -47,86 +44,53 @@ echo " [*] Starting invoice producer. Press CTRL+C to exit\n";
 
 while (true) {
     try {
-        // Get events that have ended and their associated invoices
         $stmt = $pdo->prepare("
-            SELECT 
-                e.uid_event, 
-                e.name as event_name, 
-                e.end_date,
-                ce.client_id,
-                ce.invoice_id,
-                c.company,
-                c.company_number,
-                c.company_vat,
-                i.hash as invoice_hash
-            FROM events e
-            JOIN client_event ce ON e.uid_event = ce.event_uid
-            JOIN client c ON ce.client_id = c.id
-            JOIN invoice i ON ce.invoice_id = i.id
-            WHERE e.end_date < NOW()
-            AND ce.invoice_sent = 0
+            SELECT uid_event, name 
+            FROM events 
+            WHERE end_date < NOW() 
+            AND processed = FALSE LIMIT 1
         ");
         $stmt->execute();
-        $events = $stmt->fetchAll();
-        
-        $count = count($events);
-        echo " [x] Found {$count} event(s) with invoices to send.\n";
+        $data = $stmt->fetch();
 
-        foreach ($events as $event) {
-            echo " [*] Processing invoice for event {$event['event_name']} for client {$event['email']}\n";
-            
-            // Create XML with invoice URL and client/company information
-            $xml = new SimpleXMLElement("<attendify/>");
-            $info = $xml->addChild('info');
-            $info->addChild('sender', 'billing');
-            $info->addChild('operation', 'send');
-            
-            $invoice = $xml->addChild('invoice');
-            $invoice->addChild('event_uid', $event['uid_event']);
-            $invoice->addChild('event_name', $event['event_name']);
-            $invoice->addChild('invoice_id', $event['invoice_id']);
-            $invoice->addChild('invoice_url', "https://billing.attendify.com/invoice/{$event['invoice_hash']}");
-            
-            $client = $xml->addChild('client');
-            $client->addChild('email', $event['email']);
-            $client->addChild('first_name', $event['first_name']);
-            $client->addChild('last_name', $event['last_name']);
-            
-            if ($event['company']) {
-                $company = $xml->addChild('company');
-                $company->addChild('name', $event['company']);
-                $company->addChild('number', $event['company_number']);
-                $company->addChild('vat', $event['company_vat']);
-            }
-
-            // Format XML
-            $dom = new DOMDocument("1.0");
-            $dom->preserveWhiteSpace = false;
-            $dom->formatOutput = true;
-            $dom->loadXML($xml->asXML());
-
-            // Send to invoice queue
-            $msgOut = new AMQPMessage($dom->saveXML(), ['content-type' => 'application/xml']);
-            $channel->basic_publish($msgOut, 'invoice', 'invoice.created');
-
-            // Mark invoice as sent
-            $updateStmt = $pdo->prepare("UPDATE client_event SET invoice_sent = 1 WHERE event_uid = :event_uid AND client_id = :client_id");
-            $updateStmt->execute([
-                ':event_uid' => $event['uid_event'],
-                ':client_id' => $event['client_id']
-            ]);
-
-            echo " [✔] Sent invoice URL for event {$event['event_name']} to client {$event['email']}\n";
-            sendLog($channel, "invoice", "Sent invoice URL for event {$event['event_name']} to client {$event['email']}", 'invoice');
+        if (!$data) {
+            sleep(5);
+            continue;
         }
+
+        $event_id = $data['uid_event'];
+        $event_name = $data['name'];
+        $stmt->closeCursor();
+        
+        echo " [x] Event {$event_id} has ended. Fetching invoices...\n";
+        $invoices = fetchInvoicesData($event_id, $pdo, $channel);
+
+        if (empty($invoices)) {
+            echo " [!] No invoices found for event {$event_id}\n";
+            sendLog($channel, "invoice", "No invoices found for event {$event_id}", 'invoice');
+            continue;
+        }
+
+        foreach ($invoices as $invoice) {
+            try {
+                $xmlString = formatInvoice($invoice, $event_name);
+                publishMessage($xmlString, $channel);
+                echo " [✔] Invoice ID #{$invoice['invoice_id']} sent for company email {$invoice['email']}\n";
+                sendLog($channel, "invoice", "[✔] Invoice ID #{$invoice['invoice_id']} sent for company email {$invoice['email']}\n", 'invoice');    
+            } catch (Exception $e) {
+                echo " [!] Failed to format invoice ID #{$invoice['invoice_id']}: " . $e->getMessage() . "\n";
+                sendLog($channel, "invoice", "Failed to format invoice ID #{$invoice['invoice_id']}: " . $e->getMessage(), 'invoice');
+                continue;
+            }
+        }
+        
     } catch (Exception $e) {
-        echo " [!] Error: " . $e->getMessage() . "\n";
+        echo " [!] Error with invoices: " . $e->getMessage() . "\n";
         sendLog($channel, "invoice", "Error processing invoices: " . $e->getMessage(), 'invoice');
-        sleep(60); // Sleep for 1 minute on error
         continue;
     }
-    
-    sleep(INTERVAL);
+    markProcessed($event_id, $pdo);
+    sleep(5);
 }
 
 // Shutdown handler
@@ -135,4 +99,71 @@ function shutdownHandler($channel, $connection) {
     $channel->close();
     $connection->close();
     exit(0);
+}
+
+function fetchInvoicesData($event_id, $pdo, $channel) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT ci.invoice_id, i.hash, c.email
+            FROM company_invoice ci 
+            JOIN invoice i ON ci.invoice_id = i.id
+            JOIN company c ON ci.company_id = c.uid
+            WHERE ci.event_id = :event_id
+        ");
+        $stmt->execute([
+            ':event_id' => $event_id
+        ]);
+        $invoices = $stmt->fetchAll();
+        return $invoices;
+    } catch (PDOException $e) {
+        echo " [!] Database error: " . $e->getMessage() . "\n";
+        sendLog($channel, "invoice", "Database error while polling fetching invoices: " . $e->getMessage(), 'invoice');
+    }
+
+}
+
+function formatInvoice($invoice, $event_name) {
+        $formattedInvoice = [
+            'recipient' => $invoice['email'],
+            'company' => [
+                'name' => 'Attendify',
+                'address' => "Quai de l'Industrie 170",
+                'zip' => '1070',
+                'city' => 'Anderlecht',
+                'vat' => 'BE 0897.456.321',
+                'support_email' => 'support@attendify.com',
+                'signature' => 'The Attendify Team',
+            ],
+            'event' => [
+                'name' => $event_name,
+            ],
+            'invoice' => [
+                'url' => "http://integrationproject-2425s2-002.westeurope.cloudapp.azure.com:30056/invoice/" . $invoice['hash'],
+            ]
+        ];
+        // convert formatted user to xml
+        $xml = new SimpleXMLElement("<dto/>");
+        arrayToXml($formattedInvoice, $xml);
+    
+        // format xml
+        $dom = new DOMDocument("1.0");
+        $dom->preserveWhiteSpace = false;
+        $dom->formatOutput = true;
+        $dom->loadXML($xml->asXML());
+        return $dom->saveXML();
+
+}
+
+// publish the xml message to rabbitmq
+function publishMessage($xmlString, $channel) {
+    $msg = new AMQPMessage(
+        $xmlString,
+        ['content-type' => 'application/xml']
+    );
+        $channel->basic_publish($msg, 'invoice', 'invoice.send');
+}
+
+function markProcessed($event_id, $pdo) {
+    $pdo->prepare("UPDATE events SET processed = TRUE WHERE uid_event = :uid")
+    ->execute([':uid' => $event_id]);
 }
