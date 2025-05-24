@@ -15,11 +15,11 @@ function createInvoice($client_id, $companyDetails, $pdo, $channel) {
     $insertInvoiceSql = "INSERT INTO invoice (
                             client_id, hash, serie, nr, seller_company, seller_company_vat, seller_company_number, seller_address, seller_phone, seller_email,
                             buyer_company, buyer_company_vat, buyer_company_number, buyer_address, buyer_city, buyer_country, buyer_zip, buyer_phone, buyer_email,
-                            due_at, created_at, updated_at
+                            approved, due_at, created_at, updated_at
                         ) VALUES (
                             :client_id, :hash, :serie, :nr, :seller_company, :seller_company_vat, :seller_company_number, :seller_address, :seller_phone, :seller_email, 
                             :buyer_company, :buyer_company_vat, :buyer_company_number, :buyer_address, :buyer_city, :buyer_country, :buyer_zip, :buyer_phone, :buyer_email,
-                            :due_at, :created_at, :updated_at)";
+                            :approved, :due_at, :created_at, :updated_at)";
     $stmtInvoice = $pdo->prepare($insertInvoiceSql);
     try {
         $stmtInvoice->execute([
@@ -30,20 +30,21 @@ function createInvoice($client_id, $companyDetails, $pdo, $channel) {
             ':seller_company' => "Attendify",
             ':seller_company_vat' => "BE 0897.456.321",
             ':seller_company_number' => "0897.456.321",
-            ':seller_address' => "Quai de l'Industrie 170, 1070 Anderlecht, Belgium",
+            ':seller_address' => "Quai de l''Industrie 170, 1070 Anderlecht, Belgium",
             ':seller_phone' => "04 41 34 27 78",
             ':seller_email' => "contact@attendify.com",
         
             ':buyer_company' => $companyDetails['name'],
             ':buyer_company_vat' => $companyDetails['VATNumber'],
             ':buyer_company_number' => $companyDetails['companyNumber'],
-            ':buyer_address' => $companyDetails['billing_address_street'] . $companyDetails['billing_address_number'],
+            ':buyer_address' => $companyDetails['billing_address_street'] . " " . $companyDetails['billing_address_number'],
             ':buyer_city' => $companyDetails['billing_address_city'],
             ':buyer_country' => "Belgium",
             ':buyer_zip' => $companyDetails['billing_address_postcode'],
             ':buyer_phone' => $companyDetails['phone'],
             ':buyer_email' => $companyDetails['email'],
         
+            ':approved' => 1,
             ':due_at' => date('Y-m-d H:i:s', strtotime($currentTime . ' +14 days')),
             ':created_at' => $currentTime,
             ':updated_at' => $currentTime
