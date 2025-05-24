@@ -45,12 +45,13 @@ function saveItem($data, $row_id, $invoice_id, $charged, $pdo, $channel) {
         return;
     }
 
-    $currentTime = date('Y-m-d H:i:s');
-    if ($charged) {
-        $charged = 1;
-    } else {
-        $charged = 0;
+    $items = $data['tab_item'] ?? [];
+    if (isset($items['item_name'])) {
+        $items = [$items];
     }
+
+    $currentTime = date('Y-m-d H:i:s');
+    $charged = $charged ? 1 : 0;
 
     $insertItemSql = "INSERT INTO invoice_item (
                         invoice_id, rel_id, status, title, quantity, price, charged, taxed, created_at, updated_at
@@ -58,7 +59,7 @@ function saveItem($data, $row_id, $invoice_id, $charged, $pdo, $channel) {
                         :invoice_id, :rel_id, :status, :title, :quantity, :price, :charged, :taxed, :created_at, :updated_at)";
     $stmtItem = $pdo->prepare($insertItemSql);
 
-    foreach ($data['tab_item'] as $item) {
+    foreach ($items as $item) {
         try {
             // Calculate BTW amount based on taxed status
             //$isTaxed = $item['taxed'] ?? false;
