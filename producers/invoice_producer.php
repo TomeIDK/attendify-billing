@@ -127,7 +127,7 @@ function formatInvoice($invoice, $event_name) {
             'recipient' => $invoice['email'],
             'company' => [
                 'name' => 'Attendify',
-                'address' => "Quai de l'Industrie 170",
+                'address' => "Nijverheidskaai 170",
                 'zip' => '1070',
                 'city' => 'Anderlecht',
                 'vat' => 'BE 0897.456.321',
@@ -139,6 +139,7 @@ function formatInvoice($invoice, $event_name) {
             ],
             'invoice' => [
                 'url' => "http://integrationproject-2425s2-002.westeurope.cloudapp.azure.com:30056/invoice/" . $invoice['hash'],
+                'download' => "http://integrationproject-2425s2-002.westeurope.cloudapp.azure.com:30056/invoice/pdf/" . $invoice['hash'],
             ]
         ];
         // convert formatted user to xml

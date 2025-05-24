@@ -30,7 +30,7 @@ function createInvoice($client_id, $companyDetails, $pdo, $channel) {
             ':seller_company' => "Attendify",
             ':seller_company_vat' => "BE 0897.456.321",
             ':seller_company_number' => "0897.456.321",
-            ':seller_address' => "Quai de l''Industrie 170, 1070 Anderlecht, Belgium",
+            ':seller_address' => "Nijverheidskaai 170, 1070 Anderlecht, Belgium",
             ':seller_phone' => "04 41 34 27 78",
             ':seller_email' => "contact@attendify.com",
         
