@@ -45,9 +45,9 @@ echo " [*] Starting invoice producer. Press CTRL+C to exit\n";
 while (true) {
     try {
         $stmt = $pdo->prepare("
-            SELECT uid_event, name 
-            FROM events 
-            WHERE end_date < NOW() 
+            SELECT uid_event, name
+            FROM events
+            WHERE end_date < NOW()
             AND processed = FALSE LIMIT 1
         ");
         $stmt->execute();
@@ -61,7 +61,7 @@ while (true) {
         $event_id = $data['uid_event'];
         $event_name = $data['name'];
         $stmt->closeCursor();
-        
+
         echo " [x] Event {$event_id} has ended. Fetching invoices...\n";
         $invoices = fetchInvoicesData($event_id, $pdo, $channel);
 
@@ -76,14 +76,14 @@ while (true) {
                 $xmlString = formatInvoice($invoice, $event_name);
                 publishMessage($xmlString, $channel);
                 echo " [✔] Invoice ID #{$invoice['invoice_id']} sent for company email {$invoice['email']}\n";
-                sendLog($channel, "invoice", "[✔] Invoice ID #{$invoice['invoice_id']} sent for company email {$invoice['email']}\n", 'invoice');    
+                sendLog($channel, "invoice", "[✔] Invoice ID #{$invoice['invoice_id']} sent for company email {$invoice['email']}\n", 'invoice');
             } catch (Exception $e) {
                 echo " [!] Failed to format invoice ID #{$invoice['invoice_id']}: " . $e->getMessage() . "\n";
                 sendLog($channel, "invoice", "Failed to format invoice ID #{$invoice['invoice_id']}: " . $e->getMessage(), 'invoice');
                 continue;
             }
         }
-        
+
     } catch (Exception $e) {
         echo " [!] Error with invoices: " . $e->getMessage() . "\n";
         sendLog($channel, "invoice", "Error processing invoices: " . $e->getMessage(), 'invoice');
@@ -105,7 +105,7 @@ function fetchInvoicesData($event_id, $pdo, $channel) {
     try {
         $stmt = $pdo->prepare("
             SELECT ci.invoice_id, i.hash, c.email
-            FROM company_invoice ci 
+            FROM company_invoice ci
             JOIN invoice i ON ci.invoice_id = i.id
             JOIN company c ON ci.company_id = c.uid
             WHERE ci.event_id = :event_id
@@ -145,14 +145,13 @@ function formatInvoice($invoice, $event_name) {
         // convert formatted user to xml
         $xml = new SimpleXMLElement("<dto/>");
         arrayToXml($formattedInvoice, $xml);
-    
+
         // format xml
         $dom = new DOMDocument("1.0");
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = true;
         $dom->loadXML($xml->asXML());
         return $dom->saveXML();
-
 }
 
 // publish the xml message to rabbitmq
@@ -161,7 +160,7 @@ function publishMessage($xmlString, $channel) {
         $xmlString,
         ['content-type' => 'application/xml']
     );
-        $channel->basic_publish($msg, 'invoice', 'invoice.send');
+    $channel->basic_publish($msg, 'invoice', 'invoice.send');
 }
 
 function markProcessed($event_id, $pdo) {
