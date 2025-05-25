@@ -9,40 +9,42 @@ use PhpAmqpLib\Message\AMQPMessage;
 
 declare(ticks = 1);
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->load();
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+// $dotenv->safeload();
 
-// DB setup
-$pdo = new PDO(
-    "mysql:host={$_ENV['MYSQL_HOST']};port={$_ENV['MYSQL_PORT']};dbname={$_ENV['MYSQL_DB']};charset=utf8mb4",
-    $_ENV['MYSQL_USER'],
-    $_ENV['MYSQL_PASSWORD'],
-    [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]
-);
+define("INTERVAL", 5); // interval between db polling
+declare(ticks = 1); // signal handling for pcntl_signal
 
-// RabbitMQ setup
-$connection = new AMQPStreamConnection(
-    $_ENV['RABBITMQ_HOST'],
-    $_ENV['RABBITMQ_PORT'],
-    $_ENV['RABBITMQ_USER'],
-    $_ENV['RABBITMQ_PASSWORD'],
-    $_ENV['RABBITMQ_VHOST']
-);
+// mysql credentials
+$host       = getenv('MYSQL_HOST');
+$db         = getenv('MYSQL_DB');
+$user       = getenv('MYSQL_USER');
+$pass       = getenv('MYSQL_PASSWORD');
+$charset    = 'utf8mb4';
+$port       = getenv('MYSQL_PORT');
+
+// create pdo instance
+$dsn = "mysql:host={$host};port={$port};dbname={$db};charset={$charset}";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+];
+$pdo = new PDO($dsn, $user, $pass, $options);
+
+// rabbitmq credentials
+$connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASSWORD'), getenv('RABBITMQ_VHOST'));
 $channel = $connection->channel();
-
 echo " [x] Connected to RabbitMQ.\n";
 
 // Graceful shutdown on CTRL+C
 pcntl_signal(SIGINT, function() use ($channel, $connection) {
     shutdownHandler($channel, $connection);
 });
+echo " [*] Polling events table. Press CTRL+C to exit.\n";
 
-echo " [*] Starting invoice producer. Press CTRL+C to exit\n";
 
 while (true) {
+
     try {
         $stmt = $pdo->prepare("
             SELECT uid_event, name
@@ -53,7 +55,9 @@ while (true) {
         $stmt->execute();
         $data = $stmt->fetch();
 
+
         if (!$data) {
+            echo " [Invoices] Found no unprocessed ended events.\n";
             sleep(5);
             continue;
         }

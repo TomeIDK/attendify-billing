@@ -7,7 +7,7 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
 // $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-// $dotenv->load();
+// $dotenv->safeload();
 
 define("INTERVAL", 5); // interval between db polling
 declare(ticks = 1); // signal handling for pcntl_signal
@@ -37,7 +37,7 @@ echo " [x] Connected to RabbitMQ.\n";
 pcntl_signal(SIGINT, function() use ($channel, $connection) {
     shutdownHandler($channel, $connection);
 });
-echo " [*] Polling the user_events. Press CTRL+C to exit.\n";
+echo " [*] Polling user_events table. Press CTRL+C to exit.\n";
 
 while (true) {
 
@@ -48,7 +48,7 @@ while (true) {
     try {
         $statement->execute();
         $count = $statement->rowCount();
-        echo " [x] Found {$count} unprocessed user event(s).\n";
+        echo " [Users] Found {$count} unprocessed user event(s).\n";
 
         // process each row individually and publish a message
         while ($row = $statement->fetch()) {
@@ -56,17 +56,17 @@ while (true) {
             if ($row['operation'] == 'INSERT'){
                 $row['operation'] = 'CREATE';
             }
-            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {    
+            if ($row['operation'] === 'CREATE' && empty($row['uid'])) {
                 echo " [*] Generating UID...\n";
 
-                $row['uid'] = 'FB' . round(microtime(true) * 1000); 
+                $row['uid'] = 'FB' . round(microtime(true) * 1000);
 
                 echo " [x] UID '{$row['uid']}' generated.\n";
                 //Update client.custom_2
                 $pdo->exec("SET @is_consumer_source = 1");
 
                 $clientUpdate = $pdo->prepare(
-                    "UPDATE client SET 
+                    "UPDATE client SET
                         custom_2 = :uniqueid,
                         updated_at = :updated_at
                     WHERE id = :client_id"
@@ -100,7 +100,7 @@ while (true) {
     sleep(INTERVAL);
 }
 
-// process user data 
+// process user data
 function processRow($userData, $operation, $channel) {
     switch ($operation) {
         case 'CREATE':
